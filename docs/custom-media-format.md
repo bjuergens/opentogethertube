@@ -42,13 +42,17 @@ Each source entry in the `sources` array is a JSON object with the following key
 Each text track entry in the `textTracks` array is a JSON object with the following keys:
 
 * `url`: A valid HTTPS URL that browsers can use to retrieve the track.
-* `contentType`: A string representing the MIME type of the track. Currently, the only supported MIME type is `text/vtt`.
+* `contentType`: A string representing the MIME type of the track. Supported values are:
+  * `text/vtt` — WebVTT subtitles, rendered using the browser's native caption support.
+  * `text/x-ass` — Advanced SubStation Alpha (`.ass`) subtitles, rendered with [ASS.js](https://github.com/weizhenye/ASS) into an overlay positioned over the video. This preserves ASS styling (fonts, colors, positioning). The overlay does not capture pointer events, so clicking the video still works.
 * `name`: An optional string (max 20 characters) providing a display name for the text track.
 * `srclang`: A string (2-8 characters) indicating the language of the text track (e.g., `en`, `es`).
 * `default`: An optional boolean indicating whether this subtitle track should be enabled by default.
 
+VTT and ASS tracks can be mixed freely within the same `textTracks` array, and viewers can switch between them from the captions menu.
+
 **Important note regarding text tracks and CORS:**
-Browsers block requests for WebVTT tracks hosted on different domains than the current page by default. To make text tracks work cross-origin, your host needs to serve the VTT file with the `Access-Control-Allow-Origin` HTTP header.
+Browsers block requests for subtitle tracks hosted on different domains than the current page by default. To make text tracks work cross-origin (for both VTT and ASS files), your host needs to serve the subtitle file with the `Access-Control-Allow-Origin` HTTP header.
 
 ## Example
 
@@ -85,6 +89,12 @@ Browsers block requests for WebVTT tracks hosted on different domains than the c
       "contentType": "text/vtt",
       "name": "Español",
       "srclang": "es"
+    },
+    {
+      "url": "https://example.com/subtitles_ja.ass",
+      "contentType": "text/x-ass",
+      "name": "日本語",
+      "srclang": "ja"
     }
   ]
 }

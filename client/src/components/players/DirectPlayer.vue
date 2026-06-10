@@ -16,7 +16,7 @@
 			@error="onError"
 		>
 			<track
-				v-for="track in manifest?.textTracks ?? []"
+				v-for="track in vttTextTracks"
 				:key="track.url"
 				kind="subtitles"
 				:src="track.url"
@@ -31,11 +31,13 @@
 				default
 			/>
 		</video>
+		<div ref="assOverlay" class="ass-overlay"></div>
 	</div>
 </template>
 
 <script lang="ts" setup>
-import { nextTick, onMounted, ref, toRefs, watch } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, toRefs, watch } from "vue";
+import ASS from "assjs";
 import type { CaptionTrack, VideoTrack } from "@/models/media-tracks";
 import type { CustomMediaManifest } from "ott-common/models/zod-schemas.js";
 import type {
@@ -57,10 +59,74 @@ interface Props {
 const props = defineProps<Props>();
 const { videoUrl, videoMime, thumbnail, subtitleUrl } = toRefs(props);
 const videoElem = ref<HTMLVideoElement | undefined>();
+const assOverlay = ref<HTMLDivElement | undefined>();
 const captions = useCaptions();
 const audioBoost = useMediaAudioBoost(videoElem);
 const qualities = useQualities();
 const manifest = ref<CustomMediaManifest | null>(null);
+const assInstance = ref<ASS | null>(null);
+
+// Native <track> elements are only rendered for VTT tracks; ASS tracks are
+// rendered separately via the assjs overlay. This is the list of VTT tracks.
+const vttTextTracks = computed(
+	() => manifest.value?.textTracks?.filter(t => t.contentType === "text/vtt") ?? []
+);
+
+// Maps a unified caption track index (into manifest.textTracks, which mixes VTT
+// and ASS tracks) to the corresponding index in videoElem.textTracks (which only
+// contains the native VTT tracks). Returns -1 if the track is not a native one.
+function nativeTrackIndex(unifiedIndex: number): number {
+	const tracks = manifest.value?.textTracks ?? [];
+	if (unifiedIndex < 0 || unifiedIndex >= tracks.length) {
+		return -1;
+	}
+	if (tracks[unifiedIndex].contentType !== "text/vtt") {
+		return -1;
+	}
+	let nativeIdx = -1;
+	for (let i = 0; i <= unifiedIndex; i++) {
+		if (tracks[i].contentType === "text/vtt") {
+			nativeIdx++;
+		}
+	}
+	return nativeIdx;
+}
+
+function destroyAss(): void {
+	if (assInstance.value) {
+		assInstance.value.destroy();
+		assInstance.value = null;
+	}
+}
+
+async function showAssTrack(url: string): Promise<void> {
+	destroyAss();
+	if (!videoElem.value || !assOverlay.value) {
+		return;
+	}
+	try {
+		const response = await fetch(url);
+		if (!response.ok) {
+			console.error("DirectPlayer: failed to fetch ASS track:", response.status);
+			return;
+		}
+		const content = await response.text();
+		assInstance.value = new ASS(content, videoElem.value, {
+			container: assOverlay.value,
+		});
+	} catch (e) {
+		console.error("DirectPlayer: failed to load ASS track:", e);
+	}
+}
+
+function hideAllNativeTracks(): void {
+	if (!videoElem.value) {
+		return;
+	}
+	for (let i = 0; i < videoElem.value.textTracks.length; i++) {
+		videoElem.value.textTracks[i].mode = "hidden";
+	}
+}
 
 const emit = defineEmits<{
 	"apiready": [];
@@ -123,30 +189,28 @@ function setCaptionsEnabled(enabled: boolean): void {
 	if (!videoElem.value || captions.currentTrack.value === null) {
 		return;
 	}
-	if (
-		videoMime.value !== "application/json" &&
-		!manifest.value?.textTracks &&
-		!subtitleUrl.value
-	) {
+	const hasTracks =
+		(manifest.value?.textTracks?.length ?? 0) > 0 ||
+		(videoMime.value !== "application/json" && !!subtitleUrl.value);
+	if (!hasTracks) {
 		return;
 	}
-	if (captions.currentTrack.value === -1) {
-		if (enabled) {
-			videoElem.value.textTracks[0].mode = "showing";
-			captions.currentTrack.value = 0;
-		}
+	if (!enabled) {
+		hideAllNativeTracks();
+		destroyAss();
 		return;
 	}
-	if (captions.currentTrack.value >= videoElem.value.textTracks.length) {
-		console.warn("DirectPlayer: invalid captions track index:", captions.currentTrack.value);
-		return;
-	}
-	videoElem.value.textTracks[captions.currentTrack.value].mode = enabled ? "showing" : "hidden";
+	// Re-apply the current track (defaulting to the first one if none selected).
+	const track = captions.currentTrack.value === -1 ? 0 : captions.currentTrack.value;
+	setCaptionsTrack(track);
 }
 
 function isCaptionsEnabled(): boolean {
 	if (!videoElem.value) {
 		return false;
+	}
+	if (assInstance.value) {
+		return true;
 	}
 	return Array.from(videoElem.value.textTracks).find(t => t.mode === "showing") !== undefined;
 }
@@ -181,8 +245,22 @@ function setCaptionsTrack(track: number): void {
 		return;
 	}
 	console.log("DirectPlayer: setCaptionsTrack:", track);
-	for (let i = 0; i < videoElem.value.textTracks.length; i++) {
-		videoElem.value.textTracks[i].mode = i === track ? "showing" : "hidden";
+	destroyAss();
+	hideAllNativeTracks();
+
+	const manifestTrack = manifest.value?.textTracks?.[track];
+	if (manifestTrack?.contentType === "text/x-ass") {
+		// Rendered via the assjs overlay rather than a native text track.
+		showAssTrack(manifestTrack.url);
+	} else if (manifestTrack) {
+		// VTT track from the manifest: map the unified index to the native index.
+		const nativeIdx = nativeTrackIndex(track);
+		if (nativeIdx >= 0 && nativeIdx < videoElem.value.textTracks.length) {
+			videoElem.value.textTracks[nativeIdx].mode = "showing";
+		}
+	} else if (track >= 0 && track < videoElem.value.textTracks.length) {
+		// Non-manifest track (external subtitleUrl), indexed directly.
+		videoElem.value.textTracks[track].mode = "showing";
 	}
 	captions.currentTrack.value = track;
 }
@@ -265,9 +343,8 @@ async function loadVideoSource() {
 		return;
 	}
 	// Fix for captions from previous video still showing after source change
-	for (let i = 0; i < videoElem.value.textTracks.length; i++) {
-		videoElem.value.textTracks[i].mode = "hidden";
-	}
+	hideAllNativeTracks();
+	destroyAss();
 	audioBoost.resetFailedSetup();
 	manifest.value = null;
 
@@ -306,7 +383,7 @@ async function loadVideoSource() {
 		captions.isCaptionsEnabled.value = defaultTrackIdx !== -1;
 		if (defaultTrackIdx !== -1) {
 			await nextTick();
-			videoElem.value.textTracks[defaultTrackIdx].mode = "showing";
+			setCaptionsTrack(defaultTrackIdx);
 		}
 	} else {
 		videoElem.value.src = videoUrl.value;
@@ -383,6 +460,10 @@ onMounted(() => {
 	loadVideoSource();
 });
 
+onUnmounted(() => {
+	destroyAss();
+});
+
 watch([videoUrl, subtitleUrl], () => {
 	console.log("DirectPlayer: videoUrl or subtitleUrl changed");
 	loadVideoSource();
@@ -414,6 +495,7 @@ defineExpose({
 <!-- biome-ignore lint/nursery/useScopedStyles: biome migration -->
 <style lang="scss">
 .direct {
+	position: relative;
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -429,5 +511,14 @@ defineExpose({
 	height: 100%;
 	object-fit: contain;
 	object-position: 50% 50%;
+}
+
+/* Overlay that hosts ASS subtitles rendered by assjs. It must never intercept
+   pointer events so clicks pass through to the video underneath. */
+.ass-overlay {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	overflow: hidden;
 }
 </style>
