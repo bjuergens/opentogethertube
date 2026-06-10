@@ -1,0 +1,19 @@
+# OpenTogetherTube production config
+# Loaded inside the container because NODE_ENV=production.
+
+hostname = "ott.wotanii.de"
+base_url = "https://ott.wotanii.de"
+
+log = { level = "info" }
+
+# generate your own: openssl rand -hex 32  (must be >= 40 characters)
+api_key = ""
+# generate your own: openssl rand -hex 64  (must be >= 80 characters)
+session_secret = ""
+
+# one reverse proxy in front (host nginx)
+trust_proxy = 1
+
+[info_extractor.youtube]
+# get your own key from https://console.developers.google.com/apis/credentials
+api_key = ""
