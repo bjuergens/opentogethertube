@@ -1,20 +1,19 @@
 # VPS deployment (ott.wotanii.de)
 
-Runs the prebuilt `dyc3/opentogethertube` image with redis and postgres via
-docker compose. The app listens on `127.0.0.1:8123` (HTTP) on the host; the
-host's nginx terminates TLS for `https://ott.wotanii.de` and reverse-proxies
-to that port.
+Builds the monolith image from this fork's source (via
+`deploy/monolith.Dockerfile`) and runs it with redis and postgres via docker
+compose. The app listens on `127.0.0.1:8123` (HTTP) on the host; the host's
+nginx terminates TLS for `https://ott.wotanii.de` and reverse-proxies to that
+port.
 
 ## Setup
 
 ```bash
-# 1. copy this directory to the VPS
-mkdir -p /srv/opentogethertube
-cp -r deploy/vps/* deploy/vps/.env.example /srv/opentogethertube/
-cd /srv/opentogethertube
+# 1. clone the fork to the VPS
+git clone https://github.com/bjuergens/opentogethertube /srv/opentogethertube
+cd /srv/opentogethertube/deploy/vps
 
 # 2. set a postgres password
-cp .env.example .env
 echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" > .env
 
 # 3. fill in secrets in env/production.toml
@@ -23,8 +22,8 @@ echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)" > .env
 #    optionally a youtube api key
 $EDITOR env/production.toml
 
-# 4. start
-docker compose up -d
+# 4. build and start
+GIT_COMMIT=$(git rev-parse HEAD) docker compose up -d --build
 
 # 5. verify it answers on plain http
 curl http://127.0.0.1:8123/api/status
@@ -41,12 +40,24 @@ nginx -t && systemctl reload nginx
 
 Then open https://ott.wotanii.de.
 
+## Updating
+
+```bash
+cd /srv/opentogethertube
+git stash            # your edited env/production.toml lives in the repo tree
+git pull
+git stash pop
+cd deploy/vps
+GIT_COMMIT=$(git rev-parse HEAD) docker compose up -d --build
+```
+
 ## Notes
 
 -   The websocket proxy headers in the nginx config are required — without
     them rooms will load but never sync.
+-   `env/docker.base.toml` must stay next to `production.toml` — it tells the
+    server to use postgres instead of sqlite.
 -   To change the host port, edit the `ports:` mapping in
     `docker-compose.yml` and the `proxy_pass` in the nginx config.
--   Update: `docker compose pull && docker compose up -d`
 -   Logs: `docker compose logs -f opentogethertube`
 -   Data lives in the named volumes `db-data-redis` and `db-data-postgres`.

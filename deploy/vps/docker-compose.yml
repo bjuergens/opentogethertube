@@ -1,6 +1,13 @@
 services:
   opentogethertube:
-    image: dyc3/opentogethertube:latest
+    # built from this fork's source, not the upstream docker hub image
+    image: opentogethertube:local
+    build:
+      context: ../..
+      dockerfile: deploy/monolith.Dockerfile
+      target: docker-stage
+      args:
+        - GIT_COMMIT=${GIT_COMMIT:-unknown}
     container_name: opentogethertube
     environment:
       - PORT=8080
