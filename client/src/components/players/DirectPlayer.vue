@@ -77,6 +77,9 @@ const vttTracks = computed(() => {
 let assInstance: ASS | null = null;
 let assTrackIdx: number | null = null;
 let assVisible = false;
+let assLoadPromise: Promise<void> | null = null;
+let assLoadingIdx: number | null = null;
+let assGeneration = 0;
 let loadGeneration = 0;
 
 const emit = defineEmits<{
@@ -153,10 +156,62 @@ function nativeTrackIndex(manifestIdx: number): number {
 }
 
 function destroyAss(): void {
+	assGeneration++;
 	assInstance?.destroy();
 	assInstance = null;
 	assTrackIdx = null;
 	assVisible = false;
+}
+
+function parseAssTimestamp(timestamp: string): number {
+	const parts = timestamp.split(":");
+	if (parts.length !== 3) {
+		return NaN;
+	}
+	return Number(parts[0]) * 3600 + Number(parts[1]) * 60 + Number(parts[2]);
+}
+
+/**
+ * Logs diagnostic info about a fetched ASS file, and warns when none of its
+ * dialogue events overlap the video's duration (e.g. episode-timed subtitles
+ * paired with a short clip), which would otherwise silently render nothing.
+ */
+function logAssDiagnostics(content: string): void {
+	let eventCount = 0;
+	let firstStart = Infinity;
+	let lastEnd = -Infinity;
+	for (const line of content.split("\n")) {
+		if (!line.startsWith("Dialogue:")) {
+			continue;
+		}
+		eventCount++;
+		const fields = line.split(",");
+		const start = parseAssTimestamp(fields[1] ?? "");
+		const end = parseAssTimestamp(fields[2] ?? "");
+		if (!isNaN(start)) {
+			firstStart = Math.min(firstStart, start);
+		}
+		if (!isNaN(end)) {
+			lastEnd = Math.max(lastEnd, end);
+		}
+	}
+	if (eventCount === 0) {
+		console.warn("DirectPlayer: ASS track contains no dialogue events");
+		return;
+	}
+	console.log(
+		`DirectPlayer: ASS track loaded: ${eventCount} dialogue events, ` +
+			`spanning ${firstStart.toFixed(2)}s - ${lastEnd.toFixed(2)}s`
+	);
+	const duration = videoElem.value?.duration ?? manifest.value?.duration;
+	if (duration && isFinite(duration) && (firstStart >= duration || lastEnd <= 0)) {
+		console.warn(
+			`DirectPlayer: no ASS dialogue events overlap the video ` +
+				`(events: ${firstStart.toFixed(2)}s - ${lastEnd.toFixed(2)}s, ` +
+				`video duration: ${duration.toFixed(2)}s) - subtitles will not be visible. ` +
+				`Are the subtitle timestamps offset relative to this video?`
+		);
+	}
 }
 
 async function activateAssTrack(manifestIdx: number): Promise<void> {
@@ -169,18 +224,38 @@ async function activateAssTrack(manifestIdx: number): Promise<void> {
 		assVisible = true;
 		return;
 	}
+	if (assLoadingIdx === manifestIdx && assLoadPromise) {
+		// this track is already being loaded, don't fetch it again
+		return assLoadPromise;
+	}
 	destroyAss();
+	assLoadingIdx = manifestIdx;
+	assLoadPromise = loadAssTrack(manifestIdx, track.url).finally(() => {
+		assLoadingIdx = null;
+		assLoadPromise = null;
+	});
+	return assLoadPromise;
+}
+
+async function loadAssTrack(manifestIdx: number, url: string): Promise<void> {
 	const generation = loadGeneration;
+	const localAssGeneration = assGeneration;
 	try {
-		const response = await fetch(track.url);
+		const response = await fetch(url);
 		if (!response.ok) {
 			throw new Error(`HTTP ${response.status}`);
 		}
 		const content = await response.text();
-		if (generation !== loadGeneration || !videoElem.value || !assContainer.value) {
-			// a new video source was loaded while we were fetching
+		if (
+			generation !== loadGeneration ||
+			localAssGeneration !== assGeneration ||
+			!videoElem.value ||
+			!assContainer.value
+		) {
+			// a new video source or another ASS track was loaded while we were fetching
 			return;
 		}
+		logAssDiagnostics(content);
 		assInstance = new ASS(content, videoElem.value, {
 			container: assContainer.value,
 		});
