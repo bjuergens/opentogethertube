@@ -214,6 +214,94 @@ function logAssDiagnostics(content: string): void {
 	}
 }
 
+/**
+ * Detects whether a font family is available to the browser by comparing
+ * rendered text widths against generic fallback fonts. `document.fonts.check()`
+ * is unreliable for system-installed fonts, so canvas measurement is used instead.
+ */
+function isFontAvailable(family: string): boolean {
+	const canvas = document.createElement("canvas");
+	const ctx = canvas.getContext("2d");
+	if (!ctx) {
+		return true;
+	}
+	const sample = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+	return ["monospace", "serif", "sans-serif"].some(fallback => {
+		ctx.font = `32px ${fallback}`;
+		const fallbackWidth = ctx.measureText(sample).width;
+		ctx.font = `32px "${family.replace(/"/g, "")}", ${fallback}`;
+		return ctx.measureText(sample).width !== fallbackWidth;
+	});
+}
+
+function collectAssFonts(content: string): Set<string> {
+	const fonts = new Set<string>();
+	for (const line of content.split("\n")) {
+		if (line.startsWith("Style:")) {
+			// Fontname is the second field of a style definition
+			const fontname = line.slice("Style:".length).split(",")[1]?.trim();
+			if (fontname) {
+				fonts.add(fontname);
+			}
+		} else if (line.startsWith("Dialogue:")) {
+			for (const match of line.matchAll(/\\fn([^\\}]+)/g)) {
+				const fontname = match[1].trim();
+				if (fontname) {
+					fonts.add(fontname);
+				}
+			}
+		}
+	}
+	return fonts;
+}
+
+function logAssFontDiagnostics(content: string): void {
+	const fonts = collectAssFonts(content);
+	if (fonts.size === 0) {
+		return;
+	}
+	const missing = Array.from(fonts).filter(f => !isFontAvailable(f));
+	console.log(
+		`DirectPlayer: ASS track references ${fonts.size} fonts:`,
+		Array.from(fonts).join(", ")
+	);
+	if (missing.length > 0) {
+		console.warn(
+			`DirectPlayer: ${missing.length} ASS fonts are not available in this browser ` +
+				`and will fall back to default fonts: ${missing.join(", ")}`
+		);
+	}
+}
+
+function logAssResolutionDiagnostics(content: string): void {
+	const playResX = Number(/^PlayResX:\s*(\d+)/m.exec(content)?.[1]);
+	const playResY = Number(/^PlayResY:\s*(\d+)/m.exec(content)?.[1]);
+	if (!playResX || !playResY) {
+		console.warn(
+			"DirectPlayer: ASS track does not specify PlayResX/PlayResY - " +
+				"subtitle positioning and scaling may be incorrect"
+		);
+		return;
+	}
+	const videoWidth = videoElem.value?.videoWidth ?? 0;
+	const videoHeight = videoElem.value?.videoHeight ?? 0;
+	console.log(
+		`DirectPlayer: ASS script resolution: ${playResX}x${playResY}, ` +
+			`video resolution: ${videoWidth && videoHeight ? `${videoWidth}x${videoHeight}` : "not loaded yet"}`
+	);
+	if (videoWidth && videoHeight) {
+		const scriptAspect = playResX / playResY;
+		const videoAspect = videoWidth / videoHeight;
+		if (Math.abs(scriptAspect - videoAspect) > 0.01) {
+			console.warn(
+				`DirectPlayer: ASS script aspect ratio (${scriptAspect.toFixed(3)}) does not ` +
+					`match video aspect ratio (${videoAspect.toFixed(3)}) - ` +
+					`subtitle positioning may be off`
+			);
+		}
+	}
+}
+
 async function activateAssTrack(manifestIdx: number): Promise<void> {
 	const track = manifestTrack(manifestIdx);
 	if (!track || !videoElem.value || !assContainer.value) {
@@ -256,6 +344,8 @@ async function loadAssTrack(manifestIdx: number, url: string): Promise<void> {
 			return;
 		}
 		logAssDiagnostics(content);
+		logAssResolutionDiagnostics(content);
+		logAssFontDiagnostics(content);
 		assInstance = new ASS(content, videoElem.value, {
 			container: assContainer.value,
 		});
