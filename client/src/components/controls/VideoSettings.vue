@@ -1,6 +1,12 @@
 <template>
 	<Popover v-model:open="isMenuOpen" @update:open="onOpenChange">
-		<Tooltip>
+		<!--
+			disable-closing-trigger works around an upstream reka-ui issue where a
+			Popover nested inside a TooltipTrigger shares the tooltip's dismissable
+			layer, which swallows the click and prevents the popover from opening.
+			See https://github.com/unovue/reka-ui/discussions/924
+		-->
+		<Tooltip :disable-closing-trigger="true">
 			<TooltipTrigger as-child>
 				<PopoverTrigger as-child>
 					<Button
