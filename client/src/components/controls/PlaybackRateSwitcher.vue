@@ -1,18 +1,27 @@
 <template>
 	<DropdownMenu>
-		<Tooltip>
+		<!--
+			Works around an upstream reka-ui issue where a menu trigger nested
+			directly as-child of a TooltipTrigger shares the tooltip's dismissable
+			layer, which swallows the click so the menu never opens. The wrapper
+			span decouples the layers and disable-closing-trigger keeps the tooltip
+			from eating the click. See https://github.com/unovue/reka-ui/discussions/924
+		-->
+		<Tooltip :disable-closing-trigger="true">
 			<TooltipTrigger as-child>
-				<DropdownMenuTrigger as-child>
-					<Button
-						variant="ghost"
-						size="sm"
-						class="media-control font-mono"
-						:aria-label="$t('room.playback-speed')"
-						:disabled="!supported"
-					>
-						{{ formatRate(playbackRate.playbackRate.value) }}
-					</Button>
-				</DropdownMenuTrigger>
+				<span class="tooltip-anchor">
+					<DropdownMenuTrigger as-child>
+						<Button
+							variant="ghost"
+							size="sm"
+							class="media-control font-mono"
+							:aria-label="$t('room.playback-speed')"
+							:disabled="!supported"
+						>
+							{{ formatRate(playbackRate.playbackRate.value) }}
+						</Button>
+					</DropdownMenuTrigger>
+				</span>
 			</TooltipTrigger>
 			<TooltipContent side="bottom">{{ $t("room.playback-speed") }}</TooltipContent>
 		</Tooltip>
@@ -62,5 +71,9 @@ const supported = playbackRate.isPlaybackRateSupported;
 <style scoped>
 .media-control {
 	color: var(--foreground);
+}
+
+.tooltip-anchor {
+	display: inline-flex;
 }
 </style>
