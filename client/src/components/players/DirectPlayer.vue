@@ -56,7 +56,7 @@ interface Props {
 	subtitleUrl?: string;
 	/**
 	 * URL of the manifest text track to select by default for all viewers.
-	 * `""`/`null` means no subtitles by default, `undefined` means use the manifest's default flag.
+	 * `""` means no subtitles by default, `null`/`undefined` means use the manifest's default flag.
 	 */
 	defaultTrack?: string | null;
 }
@@ -590,9 +590,10 @@ async function loadVideoSource() {
 		// To reflect this in the UI correctly, now the default track index is read directly
 		// from the manifest data, and we explicitly set its mode to "showing"
 		// A per-queue-item override (set via the Edit Video dialog) takes precedence over the
-		// manifest's own default flag. `""`/`null` means "no subtitles", a URL selects that track.
+		// manifest's own default flag. `""` means "no subtitles", a URL selects that track,
+		// `null`/`undefined` falls back to the manifest's default flag.
 		let defaultTrackIdx: number;
-		if (defaultTrack.value === "" || defaultTrack.value === null) {
+		if (defaultTrack.value === "") {
 			defaultTrackIdx = -1;
 		} else if (defaultTrack.value) {
 			defaultTrackIdx =

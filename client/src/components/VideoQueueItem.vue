@@ -420,7 +420,7 @@ function getPostData(): VideoAdd {
 	const data: VideoAdd = {
 		service: item.value.service,
 		id: item.value.id,
-		// Use `item.value.*` for preview since the edited values might have been edited but not saved
+		// Use `item.value.*` for preview since the edited refs might not be saved yet
 		subtitleUrl:
 			(props.isPreview ? item.value.subtitleUrl : editedSubtitleUrl.value) ?? undefined,
 		defaultSubtitleTrack: props.isPreview
