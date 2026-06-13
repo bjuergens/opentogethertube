@@ -1,9 +1,10 @@
 <template>
 	<Popover v-model:open="isMenuOpen" @update:open="onOpenChange">
 		<!--
-			DEBUG: Tooltip temporarily removed to isolate whether the tooltip
-			nesting is what prevents the popover from opening. See onOpenChange /
-			onTriggerClick logging below.
+			No tooltip here: nesting the PopoverTrigger inside a TooltipTrigger
+			makes the two share reka-ui's dismissable layer, which swallows the
+			click so the popover never opens. See
+			https://github.com/unovue/reka-ui/discussions/924
 		-->
 		<PopoverTrigger as-child>
 			<Button
@@ -11,7 +12,6 @@
 				size="icon"
 				class="media-control"
 				:aria-label="$t('room.player-settings')"
-				@click="onTriggerClick"
 			>
 				<Icon :icon="mdiCog" class="size-5" />
 			</Button>
@@ -219,19 +219,7 @@ function resetToMainMenu(): void {
 	currentMenu.value = "main";
 }
 
-// DEBUG: temporary logging to troubleshoot the popover not opening.
-function onTriggerClick(event: MouseEvent): void {
-	// eslint-disable-next-line no-console
-	console.log("[VideoSettings] trigger click", {
-		isMenuOpen: isMenuOpen.value,
-		defaultPrevented: event.defaultPrevented,
-		target: event.target,
-	});
-}
-
 function onOpenChange(open: boolean): void {
-	// eslint-disable-next-line no-console
-	console.log("[VideoSettings] update:open ->", open);
 	if (!open) {
 		resetToMainMenu();
 	}
@@ -259,10 +247,6 @@ function selectSubtitleTrack(track: number): void {
 <style scoped>
 .media-control {
 	color: var(--foreground);
-}
-
-.tooltip-anchor {
-	display: inline-flex;
 }
 
 .menu-content {
