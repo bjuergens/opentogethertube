@@ -18,6 +18,7 @@ export interface VideoMetadata {
 	dash_url?: string;
 	src_url?: string;
 	subtitleUrl?: string;
+	defaultSubtitleTrack?: string | null;
 }
 
 export type Video = VideoId & Partial<VideoMetadata>;

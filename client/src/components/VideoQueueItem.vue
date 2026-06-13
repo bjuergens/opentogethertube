@@ -295,10 +295,7 @@ import { API } from "@/common-http";
 import { secondsToTimestamp } from "@/util/timestamp";
 import { ToastStyle } from "@/models/toast";
 import type { QueueItem, VideoAdd } from "ott-common/models/video";
-import {
-	CustomMediaManifestSchema,
-	type CustomMediaTextTrack,
-} from "ott-common/models/zod-schemas";
+import type { CustomMediaManifest, CustomMediaTextTrack } from "ott-common/models/zod-schemas";
 import { QueueMode } from "ott-common/models/types";
 import { useStore } from "@/store";
 import toast from "@/util/toast";
@@ -379,9 +376,13 @@ async function loadManifestTracks() {
 	manifestError.value = false;
 	try {
 		const response = await fetch(item.value.src_url ?? item.value.id);
-		const manifest = CustomMediaManifestSchema.parse(await response.json());
+		if (!response.ok) {
+			throw new Error(`failed to fetch manifest: ${response.status}`);
+		}
+		const manifest = (await response.json()) as CustomMediaManifest;
 		manifestTracks.value = manifest.textTracks ?? [];
-	} catch {
+	} catch (e) {
+		console.error("VideoQueueItem: failed to load manifest tracks:", e);
 		manifestError.value = true;
 		manifestTracks.value = [];
 	}
@@ -419,15 +420,13 @@ function getPostData(): VideoAdd {
 	const data: VideoAdd = {
 		service: item.value.service,
 		id: item.value.id,
-		// Use `item.value.subtitleUrl` for preview since editedSubtitleUrl might have been edited but not saved
+		// Use `item.value.*` for preview since the edited values might have been edited but not saved
 		subtitleUrl:
 			(props.isPreview ? item.value.subtitleUrl : editedSubtitleUrl.value) ?? undefined,
-	};
-	if (isManifestItem.value) {
-		data.defaultSubtitleTrack = props.isPreview
+		defaultSubtitleTrack: props.isPreview
 			? item.value.defaultSubtitleTrack
-			: selectValueToTrack(editedDefaultTrack.value);
-	}
+			: selectValueToTrack(editedDefaultTrack.value),
+	};
 	return data;
 }
 
@@ -449,9 +448,7 @@ async function saveEdit() {
 	if (props.isPreview) {
 		// Update the subtitle settings for playNow()
 		item.value.subtitleUrl = editedSubtitleUrl.value ?? undefined;
-		if (isManifestItem.value) {
-			item.value.defaultSubtitleTrack = selectValueToTrack(editedDefaultTrack.value);
-		}
+		item.value.defaultSubtitleTrack = selectValueToTrack(editedDefaultTrack.value);
 		showEditDialog.value = false;
 	} else {
 		isLoadingEdit.value = true;
