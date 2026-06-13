@@ -163,15 +163,10 @@ function nativeTrackIndex(manifestIdx: number): number {
 }
 
 /**
- * Force the assjs instance to recompute its subtitle box dimensions and
- * position. assjs sizes its box from the video element's `clientWidth`/
- * `clientHeight` and only recalculates from an internal `ResizeObserver`. That
- * observer can miss size changes (e.g. layout/window resizes), which leaves the
- * overlay scaled and positioned for the previous size, so subtitles drift off
- * screen until the page is reloaded. There is no public `resize()` method, but
- * the `resampling` setter re-runs the private resize as long as the value
- * actually changes, so we toggle to another valid mode and back. Both writes are
- * synchronous, so the final state matches the default and there is no flicker.
+ * Force assjs to recompute its subtitle box, which it otherwise only does from
+ * its own ResizeObserver (which can miss layout/window resizes). assjs has no
+ * public resize(), so toggle the `resampling` setter to another valid mode and
+ * back; both writes are synchronous, so the layout ends up unchanged.
  */
 function forceAssResize(): void {
 	if (!assInstance) {
