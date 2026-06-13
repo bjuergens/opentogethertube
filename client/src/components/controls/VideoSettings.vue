@@ -1,23 +1,26 @@
 <template>
 	<Popover v-model:open="isMenuOpen" @update:open="onOpenChange">
 		<!--
-			disable-closing-trigger works around an upstream reka-ui issue where a
-			Popover nested inside a TooltipTrigger shares the tooltip's dismissable
-			layer, which swallows the click and prevents the popover from opening.
-			See https://github.com/unovue/reka-ui/discussions/924
+			Works around an upstream reka-ui issue where a Popover trigger nested
+			directly as-child of a TooltipTrigger shares the tooltip's dismissable
+			layer, which swallows the click so the popover never opens. The wrapper
+			span decouples the layers and disable-closing-trigger keeps the tooltip
+			from eating the click. See https://github.com/unovue/reka-ui/discussions/924
 		-->
 		<Tooltip :disable-closing-trigger="true">
 			<TooltipTrigger as-child>
-				<PopoverTrigger as-child>
-					<Button
-						variant="ghost"
-						size="icon"
-						class="media-control"
-						:aria-label="$t('room.player-settings')"
-					>
-						<Icon :icon="mdiCog" class="size-5" />
-					</Button>
-				</PopoverTrigger>
+				<span class="tooltip-anchor">
+					<PopoverTrigger as-child>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="media-control"
+							:aria-label="$t('room.player-settings')"
+						>
+							<Icon :icon="mdiCog" class="size-5" />
+						</Button>
+					</PopoverTrigger>
+				</span>
 			</TooltipTrigger>
 			<TooltipContent side="bottom">{{ $t("room.player-settings") }}</TooltipContent>
 		</Tooltip>
@@ -253,6 +256,10 @@ function selectSubtitleTrack(track: number): void {
 <style scoped>
 .media-control {
 	color: var(--foreground);
+}
+
+.tooltip-anchor {
+	display: inline-flex;
 }
 
 .menu-content {
