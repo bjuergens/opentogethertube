@@ -53,6 +53,10 @@ const QueueItemExtrasSchema = z.object({
 	// startAt: z.number().nonnegative().optional(),
 	// endAt: z.number().positive().optional(),
 	subtitleUrl: z.string().url().optional(),
+	defaultSubtitleTrack: z
+		.union([z.string().url(), z.literal("")])
+		.nullable()
+		.optional(),
 });
 
 const VideoAddSchema = VideoIdSchema.extend(QueueItemExtrasSchema.shape);
@@ -169,7 +173,7 @@ const CustomMediaSourceSchema = z.object({
 // 		.startsWith("audio", "contentType must be an audio MIME type"),
 // });
 
-const CustomMediaTextTrackSchema = z.object({
+export const CustomMediaTextTrackSchema = z.object({
 	url: z.string().url("text track url must be a valid URL"),
 	contentType: z.enum(["text/vtt", "text/x-ass"], {
 		errorMap: () => ({ message: "contentType must be one of: text/vtt, text/x-ass" }),
@@ -204,3 +208,4 @@ export const CustomMediaManifestSchema = z.object({
 });
 
 export type CustomMediaManifest = z.infer<typeof CustomMediaManifestSchema>;
+export type CustomMediaTextTrack = z.infer<typeof CustomMediaTextTrackSchema>;
