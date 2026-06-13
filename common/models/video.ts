@@ -25,6 +25,11 @@ export interface QueueItemExtras {
 	startAt?: number;
 	endAt?: number;
 	subtitleUrl?: string;
+	/**
+	 * URL of the text track that should be selected by default for all viewers.
+	 * `""` means no subtitles by default, `null` or absent means use the manifest's default flag.
+	 */
+	defaultSubtitleTrack?: string | null;
 }
 
 export type VideoAdd = VideoId & QueueItemExtras;
