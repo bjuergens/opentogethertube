@@ -1,29 +1,21 @@
 <template>
 	<Popover v-model:open="isMenuOpen" @update:open="onOpenChange">
 		<!--
-			Works around an upstream reka-ui issue where a Popover trigger nested
-			directly as-child of a TooltipTrigger shares the tooltip's dismissable
-			layer, which swallows the click so the popover never opens. The wrapper
-			span decouples the layers and disable-closing-trigger keeps the tooltip
-			from eating the click. See https://github.com/unovue/reka-ui/discussions/924
+			DEBUG: Tooltip temporarily removed to isolate whether the tooltip
+			nesting is what prevents the popover from opening. See onOpenChange /
+			onTriggerClick logging below.
 		-->
-		<Tooltip :disable-closing-trigger="true">
-			<TooltipTrigger as-child>
-				<span class="tooltip-anchor">
-					<PopoverTrigger as-child>
-						<Button
-							variant="ghost"
-							size="icon"
-							class="media-control"
-							:aria-label="$t('room.player-settings')"
-						>
-							<Icon :icon="mdiCog" class="size-5" />
-						</Button>
-					</PopoverTrigger>
-				</span>
-			</TooltipTrigger>
-			<TooltipContent side="bottom">{{ $t("room.player-settings") }}</TooltipContent>
-		</Tooltip>
+		<PopoverTrigger as-child>
+			<Button
+				variant="ghost"
+				size="icon"
+				class="media-control"
+				:aria-label="$t('room.player-settings')"
+				@click="onTriggerClick"
+			>
+				<Icon :icon="mdiCog" class="size-5" />
+			</Button>
+		</PopoverTrigger>
 
 		<PopoverContent side="top" align="center" class="w-auto min-w-[260px] p-1">
 			<Transition name="menu-resize" mode="out-in">
@@ -132,7 +124,6 @@
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ref, computed } from "vue";
 import { useCaptions, useQualities } from "../composables";
 import {
@@ -228,7 +219,19 @@ function resetToMainMenu(): void {
 	currentMenu.value = "main";
 }
 
+// DEBUG: temporary logging to troubleshoot the popover not opening.
+function onTriggerClick(event: MouseEvent): void {
+	// eslint-disable-next-line no-console
+	console.log("[VideoSettings] trigger click", {
+		isMenuOpen: isMenuOpen.value,
+		defaultPrevented: event.defaultPrevented,
+		target: event.target,
+	});
+}
+
 function onOpenChange(open: boolean): void {
+	// eslint-disable-next-line no-console
+	console.log("[VideoSettings] update:open ->", open);
 	if (!open) {
 		resetToMainMenu();
 	}
