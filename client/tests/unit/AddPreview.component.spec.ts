@@ -39,6 +39,33 @@ describe("AddPreview component", () => {
 		expect(wrapper.findAll(".video")).toHaveLength(1);
 	});
 
+	it("immediately queries a pasted multi-line list of URLs", async () => {
+		API.get.mockResolvedValueOnce({
+			data: {
+				success: true,
+				result: [
+					{ service: "youtube", id: "1", title: "Foo", description: "Bar", length: 100 },
+					{ service: "youtube", id: "2", title: "Baz", description: "Qux", length: 100 },
+				],
+			},
+		});
+		const { wrapper, store } = mountComponent(AddPreview);
+		store.state.production = true;
+
+		store.state.production = true;
+		await wrapper.vm.$nextTick();
+		const input =
+			"https://youtube.com/watch?v=LP8GRjv6AIo\nhttps://youtube.com/watch?v=IG2JF0P4GFA";
+		await wrapper.get('[data-cy="add-preview-input"]').setValue(input);
+		await new Promise(resolve => setTimeout(resolve, 1100));
+		await flush();
+
+		expect(API.get).toHaveBeenCalledWith(
+			`/data/previewAdd?input=${encodeURIComponent(input)}`,
+		);
+		expect(wrapper.findAll(".video")).toHaveLength(2);
+	});
+
 	it("does not query non-URLs until manual search", async () => {
 		API.get.mockResolvedValueOnce({
 			data: {

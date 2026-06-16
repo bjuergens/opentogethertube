@@ -250,7 +250,8 @@ export default {
 	"add-preview": {
 		label: "Link or Search",
 		"add-all": "Add All",
-		placeholder: "Type to search YouTube or enter a Video URL to add to the queue",
+		placeholder:
+			"Type to search YouTube, or enter one or more Video URLs (one per line) to add to the queue",
 		title: "What can I add?",
 		"single-videos": "Single Videos",
 		playlists: "Playlists",
