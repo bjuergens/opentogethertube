@@ -63,8 +63,7 @@ export function useAssOverlay(
 		visible.value = false;
 	}
 
-	async function fetchAndCreate(url: string): Promise<void> {
-		const gen = generation;
+	async function fetchAndCreate(url: string, gen: number): Promise<void> {
 		try {
 			const response = await fetch(url);
 			if (!response.ok) {
@@ -86,7 +85,11 @@ export function useAssOverlay(
 			recompute();
 		} catch (e) {
 			console.error("useAssOverlay: failed to load ASS subtitles:", e);
-			destroy();
+			// Only tear down if this load is still the current one; a stale/failed
+			// fetch must not destroy an overlay a newer load() has since created.
+			if (gen === generation) {
+				destroy();
+			}
 		}
 	}
 
@@ -107,10 +110,14 @@ export function useAssOverlay(
 			return loadPromise;
 		}
 		destroy();
+		const gen = generation;
 		loadingUrl = url;
-		loadPromise = fetchAndCreate(url).finally(() => {
-			loadingUrl = null;
-			loadPromise = null;
+		loadPromise = fetchAndCreate(url, gen).finally(() => {
+			// Don't clobber de-dupe state if a newer load() has already taken over.
+			if (gen === generation) {
+				loadingUrl = null;
+				loadPromise = null;
+			}
 		});
 		return loadPromise;
 	}
