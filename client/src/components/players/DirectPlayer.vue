@@ -36,8 +36,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, toRefs, watch } from "vue";
-import ASS from "assjs";
+import { computed, nextTick, onMounted, ref, toRefs, watch } from "vue";
 import type { CaptionTrack, VideoTrack } from "@/models/media-tracks";
 import type { CustomMediaManifest } from "ott-common/models/zod-schemas.js";
 import type {
@@ -46,7 +45,7 @@ import type {
 	MediaPlayerWithPlaybackRate,
 	MediaPlayerWithQuality,
 } from "../composables";
-import { useCaptions, useMediaAudioBoost, useQualities } from "../composables";
+import { useAssOverlay, useCaptions, useMediaAudioBoost, useQualities } from "../composables";
 
 interface Props {
 	service: string;
@@ -79,15 +78,7 @@ const vttTracks = computed(() => {
 	}
 	return vtt;
 });
-let assInstance: ASS | null = null;
-let assTrackIdx: number | null = null;
-let assVisible = false;
-let assLoadPromise: Promise<void> | null = null;
-let assLoadingIdx: number | null = null;
-let assGeneration = 0;
-let assResizeObserver: ResizeObserver | null = null;
-let assResizeRaf: number | null = null;
-let loadGeneration = 0;
+const assOverlay = useAssOverlay(videoElem, assContainer);
 
 const emit = defineEmits<{
 	"apiready": [];
@@ -163,105 +154,14 @@ function nativeTrackIndex(manifestIdx: number): number {
 }
 
 /**
- * Force assjs to recompute its subtitle box, which it otherwise only does from
- * its own ResizeObserver (which can miss layout/window resizes). assjs has no
- * public resize(), so toggle the `resampling` setter to another valid mode and
- * back; both writes are synchronous, so the layout ends up unchanged.
+ * Activate the ASS overlay for the given manifest track index, if it exists.
  */
-function forceAssResize(): void {
-	if (!assInstance) {
-		return;
-	}
-	const current = assInstance.resampling;
-	assInstance.resampling = current === "video_height" ? "video_width" : "video_height";
-	assInstance.resampling = current;
-}
-
-function scheduleAssResize(): void {
-	if (assResizeRaf !== null) {
-		return;
-	}
-	assResizeRaf = requestAnimationFrame(() => {
-		assResizeRaf = null;
-		forceAssResize();
-	});
-}
-
-function observeAssResize(): void {
-	if (assResizeObserver || !videoElem.value) {
-		return;
-	}
-	assResizeObserver = new ResizeObserver(scheduleAssResize);
-	assResizeObserver.observe(videoElem.value);
-}
-
-function destroyAss(): void {
-	assGeneration++;
-	if (assResizeObserver) {
-		assResizeObserver.disconnect();
-		assResizeObserver = null;
-	}
-	if (assResizeRaf !== null) {
-		cancelAnimationFrame(assResizeRaf);
-		assResizeRaf = null;
-	}
-	assInstance?.destroy();
-	assInstance = null;
-	assTrackIdx = null;
-	assVisible = false;
-}
-
-async function activateAssTrack(manifestIdx: number): Promise<void> {
+function activateAssTrack(manifestIdx: number): Promise<void> {
 	const track = manifestTrack(manifestIdx);
-	if (!track || !videoElem.value || !assContainer.value) {
-		return;
+	if (!track) {
+		return Promise.resolve();
 	}
-	if (assTrackIdx === manifestIdx && assInstance) {
-		assInstance.show();
-		assVisible = true;
-		return;
-	}
-	if (assLoadingIdx === manifestIdx && assLoadPromise) {
-		// this track is already being loaded, don't fetch it again
-		return assLoadPromise;
-	}
-	destroyAss();
-	assLoadingIdx = manifestIdx;
-	assLoadPromise = loadAssTrack(manifestIdx, track.url).finally(() => {
-		assLoadingIdx = null;
-		assLoadPromise = null;
-	});
-	return assLoadPromise;
-}
-
-async function loadAssTrack(manifestIdx: number, url: string): Promise<void> {
-	const generation = loadGeneration;
-	const localAssGeneration = assGeneration;
-	try {
-		const response = await fetch(url);
-		if (!response.ok) {
-			throw new Error(`HTTP ${response.status}`);
-		}
-		const content = await response.text();
-		if (
-			generation !== loadGeneration ||
-			localAssGeneration !== assGeneration ||
-			!videoElem.value ||
-			!assContainer.value
-		) {
-			// a new video source or another ASS track was loaded while we were fetching
-			return;
-		}
-		assInstance = new ASS(content, videoElem.value, {
-			container: assContainer.value,
-		});
-		assTrackIdx = manifestIdx;
-		assVisible = true;
-		observeAssResize();
-	} catch (e) {
-		console.error("DirectPlayer: failed to load ASS subtitles:", e);
-		destroyAss();
-	}
+	return assOverlay.load(track.url);
 }
 
 function setCaptionsEnabled(enabled: boolean): void {
@@ -294,8 +194,7 @@ function setCaptionsEnabled(enabled: boolean): void {
 			if (enabled) {
 				activateAssTrack(captions.currentTrack.value);
 			} else {
-				assInstance?.hide();
-				assVisible = false;
+				assOverlay.hide();
 			}
 			return;
 		}
@@ -314,7 +213,7 @@ function isCaptionsEnabled(): boolean {
 	if (!videoElem.value) {
 		return false;
 	}
-	if (assVisible) {
+	if (assOverlay.visible.value) {
 		return true;
 	}
 	return Array.from(videoElem.value.textTracks).find(t => t.mode === "showing") !== undefined;
@@ -363,8 +262,7 @@ function setCaptionsTrack(track: number): void {
 		if (selected.contentType === "text/x-ass") {
 			activateAssTrack(track);
 		} else {
-			assInstance?.hide();
-			assVisible = false;
+			assOverlay.hide();
 		}
 		captions.currentTrack.value = track;
 		return;
@@ -452,12 +350,11 @@ async function loadVideoSource() {
 		console.error("player not ready");
 		return;
 	}
-	loadGeneration++;
 	// Fix for captions from previous video still showing after source change
 	for (let i = 0; i < videoElem.value.textTracks.length; i++) {
 		videoElem.value.textTracks[i].mode = "hidden";
 	}
-	destroyAss();
+	assOverlay.destroy();
 	audioBoost.resetFailedSetup();
 	manifest.value = null;
 
@@ -586,10 +483,6 @@ function onError(err: Event) {
 
 onMounted(() => {
 	loadVideoSource();
-});
-
-onBeforeUnmount(() => {
-	destroyAss();
 });
 
 watch([videoUrl, subtitleUrl], () => {
