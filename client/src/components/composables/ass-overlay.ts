@@ -26,17 +26,20 @@ export function useAssOverlay(
 	const visible = ref(false);
 
 	/**
-	 * Force assjs to recompute its subtitle box. assjs has no public resize(),
-	 * but its `resampling` setter re-runs the internal resize even when assigned
-	 * the same (valid) value, so writing the current mode back is a no-op
-	 * layout-wise while triggering a recompute against the current video
-	 * dimensions.
+	 * Force assjs to recompute its subtitle box. assjs has no public resize() —
+	 * the resize logic lives in a private `#resize` only invoked by its internal
+	 * ResizeObserver and by the `resampling` setter. That setter early-returns
+	 * when the value is unchanged (`if (r === this.#resampling) return;`), so we
+	 * toggle to another valid mode and back: each write actually changes the
+	 * value, triggering an internal recompute, and the final mode is unchanged.
 	 */
 	function recompute(): void {
-		if (instance) {
-			const mode = instance.resampling;
-			instance.resampling = mode;
+		if (!instance) {
+			return;
 		}
+		const mode = instance.resampling;
+		instance.resampling = mode === "video_height" ? "video_width" : "video_height";
+		instance.resampling = mode;
 	}
 
 	function attachResize(video: HTMLVideoElement): void {
