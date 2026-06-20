@@ -85,6 +85,8 @@ let assVisible = false;
 let assLoadPromise: Promise<void> | null = null;
 let assLoadingIdx: number | null = null;
 let assGeneration = 0;
+let assResizeObserver: ResizeObserver | null = null;
+let assResizeRaf: number | null = null;
 let loadGeneration = 0;
 
 const emit = defineEmits<{
@@ -160,8 +162,49 @@ function nativeTrackIndex(manifestIdx: number): number {
 	return tracks.slice(0, manifestIdx).filter(t => t.contentType === "text/vtt").length;
 }
 
+/**
+ * Force assjs to recompute its subtitle box, which it otherwise only does from
+ * its own ResizeObserver (which can miss layout/window resizes). assjs has no
+ * public resize(), so toggle the `resampling` setter to another valid mode and
+ * back; both writes are synchronous, so the layout ends up unchanged.
+ */
+function forceAssResize(): void {
+	if (!assInstance) {
+		return;
+	}
+	const current = assInstance.resampling;
+	assInstance.resampling = current === "video_height" ? "video_width" : "video_height";
+	assInstance.resampling = current;
+}
+
+function scheduleAssResize(): void {
+	if (assResizeRaf !== null) {
+		return;
+	}
+	assResizeRaf = requestAnimationFrame(() => {
+		assResizeRaf = null;
+		forceAssResize();
+	});
+}
+
+function observeAssResize(): void {
+	if (assResizeObserver || !videoElem.value) {
+		return;
+	}
+	assResizeObserver = new ResizeObserver(scheduleAssResize);
+	assResizeObserver.observe(videoElem.value);
+}
+
 function destroyAss(): void {
 	assGeneration++;
+	if (assResizeObserver) {
+		assResizeObserver.disconnect();
+		assResizeObserver = null;
+	}
+	if (assResizeRaf !== null) {
+		cancelAnimationFrame(assResizeRaf);
+		assResizeRaf = null;
+	}
 	assInstance?.destroy();
 	assInstance = null;
 	assTrackIdx = null;
@@ -214,6 +257,7 @@ async function loadAssTrack(manifestIdx: number, url: string): Promise<void> {
 		});
 		assTrackIdx = manifestIdx;
 		assVisible = true;
+		observeAssResize();
 	} catch (e) {
 		console.error("DirectPlayer: failed to load ASS subtitles:", e);
 		destroyAss();
