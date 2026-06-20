@@ -1,21 +1,22 @@
 <template>
 	<DropdownMenu>
-		<Tooltip>
-			<TooltipTrigger as-child>
-				<DropdownMenuTrigger as-child>
-					<Button
-						variant="ghost"
-						size="sm"
-						class="media-control font-mono"
-						:aria-label="$t('room.playback-speed')"
-						:disabled="!supported"
-					>
-						{{ formatRate(playbackRate.playbackRate.value) }}
-					</Button>
-				</DropdownMenuTrigger>
-			</TooltipTrigger>
-			<TooltipContent side="bottom">{{ $t("room.playback-speed") }}</TooltipContent>
-		</Tooltip>
+		<!--
+			No tooltip here: nesting the DropdownMenuTrigger inside a TooltipTrigger
+			makes the two share reka-ui's dismissable layer, which swallows the
+			click so the menu never opens. See
+			https://github.com/unovue/reka-ui/discussions/924
+		-->
+		<DropdownMenuTrigger as-child>
+			<Button
+				variant="ghost"
+				size="sm"
+				class="media-control font-mono"
+				:aria-label="$t('room.playback-speed')"
+				:disabled="!supported"
+			>
+				{{ formatRate(playbackRate.playbackRate.value) }}
+			</Button>
+		</DropdownMenuTrigger>
 		<DropdownMenuContent align="center" side="top">
 			<DropdownMenuItem
 				v-for="(rate, index) in playbackRate.availablePlaybackRates.value"
@@ -37,7 +38,6 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useConnection } from "@/plugins/connection";
 import { useRoomApi } from "@/util/roomapi";
 import { usePlaybackRate } from "../composables";
