@@ -256,13 +256,23 @@ watch(inputAddPreview, () => {
 });
 
 const highlightedAddPreviewItem = ref<Video | undefined>(undefined);
-const isAddPreviewInputUrl = computed(() => {
+function isUrl(value: string): boolean {
 	try {
-		return !!new URL(inputAddPreview.value).host;
+		return !!new URL(value.trim()).host;
 		// biome-ignore lint/correctness/noUnusedVariables: biome migration
 	} catch (e) {
 		return false;
 	}
+}
+// True for a single URL or a pasted list where every non-empty line is a URL.
+// The server (resolveVideoQuery) resolves newline-separated URL lists, so we
+// treat them as URL input and let the existing preview flow handle them.
+const isAddPreviewInputUrl = computed(() => {
+	const lines = inputAddPreview.value
+		.split("\n")
+		.map(line => line.trim())
+		.filter(line => line.length > 0);
+	return lines.length > 0 && lines.every(isUrl);
 });
 const production = computed(() => {
 	/**
@@ -391,16 +401,18 @@ function onInputAddPreviewChange() {
 	requestAddPreviewDebounced();
 }
 function onInputAddPreviewKeyDown(e) {
-	if (e.keyCode === 13) {
-		e.preventDefault();
-	}
-
+	// Allow Enter to insert newlines when pasting/typing a list of URLs, so the
+	// user can build a multi-line list to bulk add. Only intercept Enter for a
+	// plain search phrase, where it triggers an explicit YouTube search.
 	if (_.trim(inputAddPreview.value).length === 0 || isAddPreviewInputUrl.value) {
 		return;
 	}
 
-	if (e.keyCode === 13 && videos.value.length === 0) {
-		requestAddPreviewExplicit();
+	if (e.keyCode === 13) {
+		e.preventDefault();
+		if (videos.value.length === 0) {
+			requestAddPreviewExplicit();
+		}
 	}
 }
 
