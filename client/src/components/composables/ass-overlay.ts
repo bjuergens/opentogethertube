@@ -13,18 +13,22 @@ import ASS from "assjs";
  * recompute on the video element's "resize" event, which fires exactly when the
  * intrinsic dimensions first appear and whenever they change.
  *
- * `currentUrl` doubles as the race token: fetchAndCreate() sets it synchronously
- * before its first await, so an in-flight fetch can tell after awaiting whether
- * it's still the active load (`currentUrl === url`) or has been superseded.
+ * Out-of-order loads are handled with a monotonic `loadSeq`: each load claims a
+ * unique id before fetching and, after awaiting, only applies its result if its
+ * id is still the latest. A value token (the url) can't do this on its own,
+ * because two concurrent loads of the *same* url would be indistinguishable.
  */
 export function useAssOverlay(
 	videoElement: Ref<HTMLVideoElement | undefined>,
 	container: Ref<HTMLElement | undefined>,
 ) {
 	let instance: ASS | null = null;
-	// The track we're currently showing or loading. Set before any await so a
-	// stale fetch can detect it's been superseded; null means nothing active.
+	// The track we're currently showing or loading; drives the "already active"
+	// fast path and dedupe. Null means nothing is active.
 	let currentUrl: string | null = null;
+	// Monotonic id bumped per load() and on teardown. An in-flight fetch compares
+	// the id it claimed against this to know if it's still the latest load.
+	let loadSeq = 0;
 	const visible = ref(false);
 
 	/**
@@ -53,13 +57,14 @@ export function useAssOverlay(
 	}
 
 	function destroy(): void {
+		// Bump the token so any in-flight load sees seq !== loadSeq and discards
+		// itself when it resolves.
+		loadSeq++;
 		if (videoElement.value) {
 			detachResize(videoElement.value);
 		}
 		instance?.destroy();
 		instance = null;
-		// Clearing currentUrl also invalidates any in-flight load: when its fetch
-		// resolves it will see currentUrl !== url and discard itself.
 		currentUrl = null;
 		visible.value = false;
 	}
@@ -69,10 +74,11 @@ export function useAssOverlay(
 		video: HTMLVideoElement,
 		box: HTMLElement,
 	): Promise<void> {
-		// Claim the slot before any await so a slower fetch can detect after
-		// awaiting that a newer load (or teardown) has taken over. Keeping this
-		// inside the function avoids the temporal coupling of requiring callers to
-		// set currentUrl first.
+		// Claim a unique id before any await. Two concurrent loads of the same url
+		// get different ids, so a slow earlier one can tell it was superseded even
+		// though the url matches. Keeping this inside the function avoids the
+		// temporal coupling of requiring callers to bump the token first.
+		const seq = ++loadSeq;
 		currentUrl = url;
 		try {
 			const response = await fetch(url);
@@ -80,14 +86,11 @@ export function useAssOverlay(
 				throw new Error(`HTTP ${response.status}`);
 			}
 			const content = await response.text();
-			if (currentUrl !== url) {
-				// A newer load() or a teardown changed the target while we fetched.
+			if (seq !== loadSeq) {
+				// A newer load() or a teardown superseded us while we fetched.
 				console.warn("useAssOverlay: discarding stale ASS load for", url);
 				return;
 			}
-			// Free any prior instance before replacing it (guards the rare case
-			// where overlapping loads for this same url both reach creation).
-			instance?.destroy();
 			instance = new ASS(content, video, { container: box });
 			visible.value = true;
 			attachResize(video);
@@ -95,7 +98,7 @@ export function useAssOverlay(
 			// event will fire later, so align the box now.
 			recompute();
 		} catch (e) {
-			if (currentUrl !== url) {
+			if (seq !== loadSeq) {
 				// Superseded while fetching; the failure is irrelevant.
 				console.info("useAssOverlay: ignoring failure of superseded ASS load for", url);
 				return;
@@ -110,7 +113,7 @@ export function useAssOverlay(
 	 * Load and display the ASS track at `url`. If it's already the active (or
 	 * in-flight) track this is a no-op beyond ensuring visibility; switching to a
 	 * different url tears down the current overlay and supersedes any in-flight
-	 * load via the `currentUrl` token.
+	 * load via the `loadSeq` token.
 	 */
 	function load(url: string): Promise<void> {
 		const video = videoElement.value;
