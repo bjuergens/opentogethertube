@@ -12,16 +12,19 @@ import ASS from "assjs";
  * video filled the whole container (no letterboxing). We fix this by forcing a
  * recompute on the video element's "resize" event, which fires exactly when the
  * intrinsic dimensions first appear and whenever they change.
+ *
+ * `currentUrl` doubles as the race token: load() sets it synchronously before
+ * any async work, so an in-flight fetch can tell after awaiting whether it's
+ * still the active load (`currentUrl === url`) or has been superseded.
  */
 export function useAssOverlay(
 	videoElement: Ref<HTMLVideoElement | undefined>,
 	container: Ref<HTMLElement | undefined>,
 ) {
 	let instance: ASS | null = null;
+	// The track we're currently showing or loading. Set before any await so a
+	// stale fetch can detect it's been superseded; null means nothing active.
 	let currentUrl: string | null = null;
-	// The in-flight load, if any: lets duplicate calls share one fetch and lets
-	// a superseding load or teardown cancel it via its AbortController.
-	let pending: { url: string; promise: Promise<void>; controller: AbortController } | null = null;
 	const visible = ref(false);
 
 	/**
@@ -49,84 +52,80 @@ export function useAssOverlay(
 		video.removeEventListener("resize", recompute);
 	}
 
-	function cancelPending(): void {
-		pending?.controller.abort();
-		pending = null;
-	}
-
 	function destroy(): void {
-		cancelPending();
 		if (videoElement.value) {
 			detachResize(videoElement.value);
 		}
 		instance?.destroy();
 		instance = null;
+		// Clearing currentUrl also invalidates any in-flight load: when its fetch
+		// resolves it will see currentUrl !== url and discard itself.
 		currentUrl = null;
 		visible.value = false;
 	}
 
 	async function fetchAndCreate(
 		url: string,
-		signal: AbortSignal,
 		video: HTMLVideoElement,
 		box: HTMLElement,
 	): Promise<void> {
 		try {
-			const response = await fetch(url, { signal });
+			const response = await fetch(url);
 			if (!response.ok) {
 				throw new Error(`HTTP ${response.status}`);
 			}
 			const content = await response.text();
-			if (signal.aborted) {
-				// a newer load() or teardown superseded us while fetching
+			if (currentUrl !== url) {
+				// A newer load() or a teardown changed the target while we fetched.
+				console.warn("useAssOverlay: discarding stale ASS load for", url);
 				return;
 			}
+			// Free any prior instance before replacing it (guards the rare case
+			// where overlapping loads for this same url both reach creation).
+			instance?.destroy();
 			instance = new ASS(content, video, { container: box });
-			currentUrl = url;
 			visible.value = true;
 			attachResize(video);
 			// If metadata is already available (e.g. cache-warm video) no "resize"
 			// event will fire later, so align the box now.
 			recompute();
 		} catch (e) {
-			if (signal.aborted) {
-				// expected: the load was cancelled, not a real failure
+			if (currentUrl !== url) {
+				// Superseded while fetching; the failure is irrelevant.
 				return;
 			}
 			console.error("useAssOverlay: failed to load ASS subtitles:", e);
+			// Release the slot so the same track can be retried.
+			currentUrl = null;
 		}
 	}
 
 	/**
-	 * Load and display the ASS track at `url`. If it's already the active track,
-	 * just make sure it's visible. Concurrent calls for the same URL share one
-	 * fetch; a different URL cancels the in-flight one.
+	 * Load and display the ASS track at `url`. If it's already the active (or
+	 * in-flight) track this is a no-op beyond ensuring visibility; switching to a
+	 * different url tears down the current overlay and supersedes any in-flight
+	 * load via the `currentUrl` token.
 	 */
 	function load(url: string): Promise<void> {
 		const video = videoElement.value;
 		const box = container.value;
 		if (!video || !box) {
-			// Called before the player mounted its elements; nothing to render onto.
-			return Promise.resolve();
+			throw new Error("useAssOverlay.load() called before the video element was mounted");
 		}
-		if (instance && currentUrl === url) {
-			show();
+		if (currentUrl === url) {
+			if (instance) {
+				console.info("useAssOverlay: track already active, ensuring visible:", url);
+				show();
+			} else {
+				console.info("useAssOverlay: track already loading:", url);
+			}
 			return Promise.resolve();
-		}
-		if (pending?.url === url) {
-			return pending.promise;
 		}
 		destroy();
-		const controller = new AbortController();
-		const promise = fetchAndCreate(url, controller.signal, video, box).finally(() => {
-			// Free the record once settled, unless a newer load already replaced it.
-			// (Clearing on failure too is what lets the same track be retried.)
-			if (pending?.controller === controller) {
-				pending = null;
-			}
-		});
-		pending = { url, promise, controller };
-		return promise;
+		// Set the token before any async work so a slower fetch can detect that a
+		// newer load has taken over.
+		currentUrl = url;
+		return fetchAndCreate(url, video, box);
 	}
 
 	function show(): void {
