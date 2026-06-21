@@ -13,9 +13,9 @@ import ASS from "assjs";
  * recompute on the video element's "resize" event, which fires exactly when the
  * intrinsic dimensions first appear and whenever they change.
  *
- * `currentUrl` doubles as the race token: load() sets it synchronously before
- * any async work, so an in-flight fetch can tell after awaiting whether it's
- * still the active load (`currentUrl === url`) or has been superseded.
+ * `currentUrl` doubles as the race token: fetchAndCreate() sets it synchronously
+ * before its first await, so an in-flight fetch can tell after awaiting whether
+ * it's still the active load (`currentUrl === url`) or has been superseded.
  */
 export function useAssOverlay(
 	videoElement: Ref<HTMLVideoElement | undefined>,
@@ -37,7 +37,7 @@ export function useAssOverlay(
 	 */
 	function recompute(): void {
 		if (!instance) {
-			return;
+			throw new Error("useAssOverlay: recompute() called with no active overlay");
 		}
 		const mode = instance.resampling;
 		instance.resampling = mode === "video_height" ? "video_width" : "video_height";
@@ -69,6 +69,11 @@ export function useAssOverlay(
 		video: HTMLVideoElement,
 		box: HTMLElement,
 	): Promise<void> {
+		// Claim the slot before any await so a slower fetch can detect after
+		// awaiting that a newer load (or teardown) has taken over. Keeping this
+		// inside the function avoids the temporal coupling of requiring callers to
+		// set currentUrl first.
+		currentUrl = url;
 		try {
 			const response = await fetch(url);
 			if (!response.ok) {
@@ -92,6 +97,7 @@ export function useAssOverlay(
 		} catch (e) {
 			if (currentUrl !== url) {
 				// Superseded while fetching; the failure is irrelevant.
+				console.info("useAssOverlay: ignoring failure of superseded ASS load for", url);
 				return;
 			}
 			console.error("useAssOverlay: failed to load ASS subtitles:", e);
@@ -122,15 +128,16 @@ export function useAssOverlay(
 			return Promise.resolve();
 		}
 		destroy();
-		// Set the token before any async work so a slower fetch can detect that a
-		// newer load has taken over.
-		currentUrl = url;
 		return fetchAndCreate(url, video, box);
 	}
 
 	function show(): void {
-		instance?.show();
-		visible.value = instance !== null;
+		if (!instance) {
+			console.warn("useAssOverlay: show() called with no active overlay");
+			return;
+		}
+		instance.show();
+		visible.value = true;
 	}
 
 	function hide(): void {
