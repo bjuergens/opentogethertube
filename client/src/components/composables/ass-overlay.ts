@@ -19,10 +19,9 @@ export function useAssOverlay(
 ) {
 	let instance: ASS | null = null;
 	let currentUrl: string | null = null;
-	let loadingUrl: string | null = null;
-	let loadPromise: Promise<void> | null = null;
-	// Bumped on every destroy/load so in-flight fetches can detect they're stale.
-	let generation = 0;
+	// The in-flight load, if any: lets duplicate calls share one fetch and lets
+	// a superseding load or teardown cancel it via its AbortController.
+	let pending: { url: string; promise: Promise<void>; controller: AbortController } | null = null;
 	const visible = ref(false);
 
 	/**
@@ -50,76 +49,84 @@ export function useAssOverlay(
 		video.removeEventListener("resize", recompute);
 	}
 
+	function cancelPending(): void {
+		pending?.controller.abort();
+		pending = null;
+	}
+
 	function destroy(): void {
-		generation++;
+		cancelPending();
 		if (videoElement.value) {
 			detachResize(videoElement.value);
 		}
 		instance?.destroy();
 		instance = null;
 		currentUrl = null;
-		loadingUrl = null;
-		loadPromise = null;
 		visible.value = false;
 	}
 
-	async function fetchAndCreate(url: string, gen: number): Promise<void> {
+	async function fetchAndCreate(
+		url: string,
+		signal: AbortSignal,
+		video: HTMLVideoElement,
+		box: HTMLElement,
+	): Promise<void> {
 		try {
-			const response = await fetch(url);
+			const response = await fetch(url, { signal });
 			if (!response.ok) {
 				throw new Error(`HTTP ${response.status}`);
 			}
 			const content = await response.text();
-			if (gen !== generation || !videoElement.value || !container.value) {
-				// a new video source or another track was selected while fetching
+			if (signal.aborted) {
+				// a newer load() or teardown superseded us while fetching
 				return;
 			}
-			instance = new ASS(content, videoElement.value, {
-				container: container.value,
-			});
+			instance = new ASS(content, video, { container: box });
 			currentUrl = url;
 			visible.value = true;
-			attachResize(videoElement.value);
+			attachResize(video);
 			// If metadata is already available (e.g. cache-warm video) no "resize"
 			// event will fire later, so align the box now.
 			recompute();
 		} catch (e) {
-			console.error("useAssOverlay: failed to load ASS subtitles:", e);
-			// Only tear down if this load is still the current one; a stale/failed
-			// fetch must not destroy an overlay a newer load() has since created.
-			if (gen === generation) {
-				destroy();
+			if (signal.aborted) {
+				// expected: the load was cancelled, not a real failure
+				return;
 			}
+			console.error("useAssOverlay: failed to load ASS subtitles:", e);
 		}
 	}
 
 	/**
 	 * Load and display the ASS track at `url`. If it's already the active track,
 	 * just make sure it's visible. Concurrent calls for the same URL share one
-	 * fetch.
+	 * fetch; a different URL cancels the in-flight one.
 	 */
 	function load(url: string): Promise<void> {
-		if (!videoElement.value || !container.value) {
+		const video = videoElement.value;
+		const box = container.value;
+		if (!video || !box) {
+			// Called before the player mounted its elements; nothing to render onto.
 			return Promise.resolve();
 		}
 		if (instance && currentUrl === url) {
 			show();
 			return Promise.resolve();
 		}
-		if (loadingUrl === url && loadPromise) {
-			return loadPromise;
+		if (pending?.url === url) {
+			return pending.promise;
 		}
 		destroy();
-		const gen = generation;
-		loadingUrl = url;
-		loadPromise = fetchAndCreate(url, gen).finally(() => {
-			// Don't clobber de-dupe state if a newer load() has already taken over.
-			if (gen === generation) {
-				loadingUrl = null;
-				loadPromise = null;
+		const controller = new AbortController();
+		const promise = fetchAndCreate(url, controller.signal, video, box).finally(() => {
+			// Free the record once settled, unless a newer load already replaced it.
+			// (Clearing on failure too is what lets the same track be retried.)
+			if (pending?.controller === controller) {
+				pending = null;
 			}
 		});
-		return loadPromise;
+		pending = { url, promise, controller };
+		return promise;
 	}
 
 	function show(): void {
