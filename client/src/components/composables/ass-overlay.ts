@@ -13,21 +13,18 @@ import ASS from "assjs";
  * recompute on the video element's "resize" event, which fires exactly when the
  * intrinsic dimensions first appear and whenever they change.
  *
- * Out-of-order loads are handled with a monotonic `loadSeq`: each load claims a
- * unique id before fetching and, after awaiting, only applies its result if its
- * id is still the latest. A value token (the url) can't do this on its own,
- * because two concurrent loads of the *same* url would be indistinguishable.
+ * Overlapping loads are disambiguated by a monotonic `loadSeq`: each load claims
+ * an id and applies its result only if still the latest, so a slow earlier fetch
+ * can't clobber a newer one even when both target the same url.
  */
 export function useAssOverlay(
 	videoElement: Ref<HTMLVideoElement | undefined>,
 	container: Ref<HTMLElement | undefined>,
 ) {
 	let instance: ASS | null = null;
-	// The track we're currently showing or loading; drives the "already active"
-	// fast path and dedupe. Null means nothing is active.
+	// The active or in-flight track; drives the fast path/dedupe. Null when none.
 	let currentUrl: string | null = null;
-	// Monotonic id bumped per load() and on teardown. An in-flight fetch compares
-	// the id it claimed against this to know if it's still the latest load.
+	// Monotonic load id, bumped per load() and on teardown; see superseded().
 	let loadSeq = 0;
 	const visible = ref(false);
 
@@ -56,10 +53,14 @@ export function useAssOverlay(
 		video.removeEventListener("resize", recompute);
 	}
 
+	/** True once a newer load() or a teardown has bumped loadSeq past `seq`. */
+	function superseded(seq: number): boolean {
+		return seq !== loadSeq;
+	}
+
 	function destroy(): void {
-		// Bump the token so any in-flight load sees seq !== loadSeq and discards
-		// itself when it resolves.
-		loadSeq++;
+		loadSeq++; // invalidate any in-flight load
+
 		if (videoElement.value) {
 			detachResize(videoElement.value);
 		}
@@ -74,11 +75,7 @@ export function useAssOverlay(
 		video: HTMLVideoElement,
 		box: HTMLElement,
 	): Promise<void> {
-		// Claim a unique id before any await. Two concurrent loads of the same url
-		// get different ids, so a slow earlier one can tell it was superseded even
-		// though the url matches. Keeping this inside the function avoids the
-		// temporal coupling of requiring callers to bump the token first.
-		const seq = ++loadSeq;
+		const seq = ++loadSeq; // claim an id before the first await
 		currentUrl = url;
 		try {
 			const response = await fetch(url);
@@ -86,26 +83,23 @@ export function useAssOverlay(
 				throw new Error(`HTTP ${response.status}`);
 			}
 			const content = await response.text();
-			if (seq !== loadSeq) {
-				// A newer load() or a teardown superseded us while we fetched.
+			if (superseded(seq)) {
 				console.warn("useAssOverlay: discarding stale ASS load for", url);
 				return;
 			}
 			instance = new ASS(content, video, { container: box });
 			visible.value = true;
 			attachResize(video);
-			// If metadata is already available (e.g. cache-warm video) no "resize"
-			// event will fire later, so align the box now.
+			// assjs sizes off the video's intrinsic dimensions; if they're already
+			// known (cache-warm) no "resize" event will fire, so align now.
 			recompute();
 		} catch (e) {
-			if (seq !== loadSeq) {
-				// Superseded while fetching; the failure is irrelevant.
-				console.info("useAssOverlay: ignoring failure of superseded ASS load for", url);
+			if (superseded(seq)) {
+				console.info("useAssOverlay: ignoring superseded ASS load failure for", url);
 				return;
 			}
 			console.error("useAssOverlay: failed to load ASS subtitles:", e);
-			// Release the slot so the same track can be retried.
-			currentUrl = null;
+			currentUrl = null; // free the slot so this track can be retried
 		}
 	}
 
