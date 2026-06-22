@@ -24,7 +24,7 @@ export function useAssOverlay(
 	let instance: ASS | null = null;
 	// The active or in-flight track; drives the fast path/dedupe. Null when none.
 	let currentUrl: string | null = null;
-	// Monotonic load id, bumped per load() and on teardown; see superseded().
+	// Monotonic load id, bumped per load() and on teardown.
 	let loadSeq = 0;
 	const visible = ref(false);
 
@@ -53,11 +53,6 @@ export function useAssOverlay(
 		video.removeEventListener("resize", recompute);
 	}
 
-	/** True once a newer load() or a teardown has bumped loadSeq past `seq`. */
-	function superseded(seq: number): boolean {
-		return seq !== loadSeq;
-	}
-
 	function destroy(): void {
 		loadSeq++; // invalidate any in-flight load
 
@@ -83,7 +78,7 @@ export function useAssOverlay(
 				throw new Error(`HTTP ${response.status}`);
 			}
 			const content = await response.text();
-			if (superseded(seq)) {
+			if (seq !== loadSeq) {
 				console.warn("useAssOverlay: discarding stale ASS load for", url);
 				return;
 			}
@@ -94,7 +89,7 @@ export function useAssOverlay(
 			// known (cache-warm) no "resize" event will fire, so align now.
 			recompute();
 		} catch (e) {
-			if (superseded(seq)) {
+			if (seq !== loadSeq) {
 				console.info("useAssOverlay: ignoring superseded ASS load failure for", url);
 				return;
 			}
