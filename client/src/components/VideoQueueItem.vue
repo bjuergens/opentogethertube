@@ -348,6 +348,12 @@ function formatTrackLabel(track: CustomMediaTextTrack): string {
 	return `${name} [${track.srclang}] (${format})`;
 }
 
+/** Fetch and parse this item's custom media manifest. */
+async function fetchManifest(): Promise<CustomMediaManifest> {
+	const resp = await axios.get<CustomMediaManifest>(item.value.src_url ?? item.value.id);
+	return resp.data;
+}
+
 const videoLength = computed(() => secondsToTimestamp(item.value?.length ?? 0));
 const videoStartAt = computed(() => secondsToTimestamp(item.value?.startAt ?? 0));
 const thumbnailSource = computed(() => {
@@ -401,15 +407,22 @@ watch(showEditDialog, async open => {
 	if (!props.isPreview) {
 		editedSubtitleUrl.value = item.value.subtitleUrl ?? "";
 	}
-	// Map the queue item's track to the select value. A non-empty value selects that
-	// track; `null`/absent (no default subtitle) selects "no subtitles".
-	editedDefaultTrack.value = item.value.defaultSubtitleTrack || TRACK_NONE;
+	// Map the queue item's track to the select value: a URL selects that track, an
+	// explicit `null` selects "no subtitles". `undefined` (never set) is provisionally
+	// "no subtitles" but gets resolved to the manifest's default track once it loads.
+	const storedTrack = item.value.defaultSubtitleTrack;
+	editedDefaultTrack.value = storedTrack ? storedTrack : TRACK_NONE;
 	if (isManifestItem.value) {
 		isLoadingManifest.value = true;
 		manifestError.value = false;
 		try {
-			const resp = await axios.get<CustomMediaManifest>(item.value.src_url ?? item.value.id);
-			manifestTracks.value = resp.data.textTracks ?? [];
+			const manifest = await fetchManifest();
+			manifestTracks.value = manifest.textTracks ?? [];
+			// Start an unset item from the manifest's own default track, if it has one.
+			if (storedTrack === undefined) {
+				const def = manifestTracks.value.find(t => t.default);
+				editedDefaultTrack.value = def ? def.url : TRACK_NONE;
+			}
 		} catch (e) {
 			console.error("VideoQueueItem: failed to load manifest tracks:", e);
 			manifestError.value = true;
@@ -457,6 +470,19 @@ async function saveEdit() {
 async function addToQueue() {
 	isLoadingAdd.value = true;
 	try {
+		// Bake the manifest's default track into the item so viewers get it by default.
+		// `undefined` means the editor never chose a track; `null` is an explicit "no
+		// subtitles" choice that must be preserved.
+		if (isManifestItem.value && item.value.defaultSubtitleTrack === undefined) {
+			try {
+				const manifest = await fetchManifest();
+				item.value.defaultSubtitleTrack =
+					manifest.textTracks?.find(t => t.default)?.url ?? null;
+			} catch (e) {
+				console.error("VideoQueueItem: failed to resolve manifest default track:", e);
+				item.value.defaultSubtitleTrack = null;
+			}
+		}
 		const resp = await API.post(`/room/${store.state.room.name}/queue`, getPostData());
 		hasError.value = !resp.data.success;
 		hasBeenAdded.value = true;
