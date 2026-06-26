@@ -292,7 +292,8 @@ import { API } from "@/common-http";
 import { secondsToTimestamp } from "@/util/timestamp";
 import { ToastStyle } from "@/models/toast";
 import type { QueueItem, VideoAdd } from "ott-common/models/video";
-import type { CustomMediaManifest, CustomMediaTextTrack } from "ott-common/models/zod-schemas";
+import type { CustomMediaTextTrack } from "ott-common/models/zod-schemas";
+import { fetchManifest, defaultTrackUrl, bakeDefaultSubtitleTrack } from "@/util/manifest";
 import { QueueMode } from "ott-common/models/types";
 import { useStore } from "@/store";
 import toast from "@/util/toast";
@@ -346,12 +347,6 @@ function formatTrackLabel(track: CustomMediaTextTrack): string {
 	return `${name} [${track.srclang}] (${format})`;
 }
 
-/** Fetch and parse this item's custom media manifest. */
-async function fetchManifest(): Promise<CustomMediaManifest> {
-	const resp = await axios.get<CustomMediaManifest>(item.value.src_url ?? item.value.id);
-	return resp.data;
-}
-
 const videoLength = computed(() => secondsToTimestamp(item.value?.length ?? 0));
 const videoStartAt = computed(() => secondsToTimestamp(item.value?.startAt ?? 0));
 const thumbnailSource = computed(() => {
@@ -387,9 +382,11 @@ function getPostData(): VideoAdd {
 		// Use `item.value.*` for preview since the edited refs might not be saved yet
 		subtitleUrl:
 			(props.isPreview ? item.value.subtitleUrl : editedSubtitleUrl.value) ?? undefined,
-		// Normalize an absent track to `null` so preview and edit posts agree.
-		defaultSubtitleTrack:
-			(props.isPreview ? item.value.defaultSubtitleTrack : editedDefaultTrack.value) ?? null,
+		// Leave the track absent (undefined) when unset so it's omitted from the request;
+		// a URL or an explicit `null` ("no subtitles") is sent as-is.
+		defaultSubtitleTrack: props.isPreview
+			? item.value.defaultSubtitleTrack
+			: editedDefaultTrack.value,
 	};
 	return data;
 }
@@ -411,11 +408,11 @@ watch(showEditDialog, async open => {
 		isLoadingManifest.value = true;
 		manifestError.value = false;
 		try {
-			const manifest = await fetchManifest();
+			const manifest = await fetchManifest(item.value.src_url ?? item.value.id);
 			manifestTracks.value = manifest.textTracks ?? [];
 			// Start an unset item from the manifest's own default track, if it has one.
 			if (storedTrack === undefined) {
-				editedDefaultTrack.value = manifestTracks.value.find(t => t.default)?.url ?? null;
+				editedDefaultTrack.value = defaultTrackUrl(manifest);
 			}
 		} catch (e) {
 			console.error("VideoQueueItem: failed to load manifest tracks:", e);
@@ -461,19 +458,8 @@ async function saveEdit() {
 async function addToQueue() {
 	isLoadingAdd.value = true;
 	try {
-		// Bake the manifest's default track into the item so viewers get it by default.
-		// `undefined` means the editor never chose a track; `null` is an explicit "no
-		// subtitles" choice that must be preserved.
-		if (isManifestItem.value && item.value.defaultSubtitleTrack === undefined) {
-			try {
-				const manifest = await fetchManifest();
-				item.value.defaultSubtitleTrack =
-					manifest.textTracks?.find(t => t.default)?.url ?? null;
-			} catch (e) {
-				console.error("VideoQueueItem: failed to resolve manifest default track:", e);
-				item.value.defaultSubtitleTrack = null;
-			}
-		}
+		// Resolve the manifest's default subtitle track into the item before adding.
+		await bakeDefaultSubtitleTrack(item.value);
 		const resp = await API.post(`/room/${store.state.room.name}/queue`, getPostData());
 		hasError.value = !resp.data.success;
 		hasBeenAdded.value = true;

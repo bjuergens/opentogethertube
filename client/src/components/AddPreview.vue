@@ -143,6 +143,7 @@ import { ToastStyle } from "@/models/toast";
 import toast from "@/util/toast";
 import type { Video } from "ott-common/models/video";
 import type { OttResponseBody, OttApiResponseAddPreview } from "ott-common/models/rest-api";
+import { bakeDefaultSubtitleTrack } from "@/util/manifest";
 import axios from "axios";
 import AddPreviewHelper from "./AddPreviewHelper.vue";
 import { ALL_VIDEO_SERVICES } from "ott-common/constants";
@@ -355,6 +356,8 @@ async function requestAddPreviewExplicit() {
 async function addAllToQueue() {
 	isLoadingAddAll.value = true;
 	try {
+		// Resolve each manifest item's default subtitle track before adding.
+		await Promise.all(videos.value.map(bakeDefaultSubtitleTrack));
 		await API.post(`/room/${route.params.roomId}/queue`, { videos: videos.value });
 	} catch (err) {
 		let message = `${err}`;
