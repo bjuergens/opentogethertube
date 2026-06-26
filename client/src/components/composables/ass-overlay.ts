@@ -27,6 +27,7 @@ export function useAssOverlay(
 	// Monotonic load id, bumped per load() and on teardown.
 	let loadSeq = 0;
 	const visible = ref(false);
+	let containerObserver: ResizeObserver | null = null;
 
 	/**
 	 * Force assjs to recompute its subtitle box. assjs has no public resize() —
@@ -45,12 +46,22 @@ export function useAssOverlay(
 		instance.resampling = mode;
 	}
 
-	function attachResize(video: HTMLVideoElement): void {
+	function attachResize(video: HTMLVideoElement, box: HTMLElement): void {
 		video.addEventListener("resize", recompute);
+		// loadedmetadata fires when intrinsic dimensions become known; it may arrive
+		// before the ASS fetch completes, so we re-run recompute here too.
+		video.addEventListener("loadedmetadata", recompute);
+		containerObserver = new ResizeObserver(() => {
+			if (instance) recompute();
+		});
+		containerObserver.observe(box);
 	}
 
 	function detachResize(video: HTMLVideoElement): void {
 		video.removeEventListener("resize", recompute);
+		video.removeEventListener("loadedmetadata", recompute);
+		containerObserver?.disconnect();
+		containerObserver = null;
 	}
 
 	function destroy(): void {
@@ -84,10 +95,10 @@ export function useAssOverlay(
 			}
 			instance = new ASS(content, video, { container: box });
 			visible.value = true;
-			attachResize(video);
-			// assjs sizes off the video's intrinsic dimensions; if they're already
-			// known (cache-warm) no "resize" event will fire, so align now.
-			recompute();
+			attachResize(video, box);
+			// Defer recompute to the next animation frame so the browser has
+			// finished layout before assjs reads the video's bounding rect.
+			requestAnimationFrame(recompute);
 		} catch (e) {
 			if (seq !== loadSeq) {
 				console.info("useAssOverlay: ignoring superseded ASS load failure for", url);
