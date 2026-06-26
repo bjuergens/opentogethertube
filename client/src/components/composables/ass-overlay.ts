@@ -48,6 +48,9 @@ export function useAssOverlay(
 
 	function attachResize(video: HTMLVideoElement, box: HTMLElement): void {
 		video.addEventListener("resize", recompute);
+		// loadedmetadata fires when intrinsic dimensions become known; it may arrive
+		// before the ASS fetch completes, so we re-run recompute here too.
+		video.addEventListener("loadedmetadata", recompute);
 		containerObserver = new ResizeObserver(() => {
 			if (instance) recompute();
 		});
@@ -56,6 +59,7 @@ export function useAssOverlay(
 
 	function detachResize(video: HTMLVideoElement): void {
 		video.removeEventListener("resize", recompute);
+		video.removeEventListener("loadedmetadata", recompute);
 		containerObserver?.disconnect();
 		containerObserver = null;
 	}
@@ -92,9 +96,9 @@ export function useAssOverlay(
 			instance = new ASS(content, video, { container: box });
 			visible.value = true;
 			attachResize(video, box);
-			// assjs sizes off the video's intrinsic dimensions; if they're already
-			// known (cache-warm) no "resize" event will fire, so align now.
-			recompute();
+			// Defer recompute to the next animation frame so the browser has
+			// finished layout before assjs reads the video's bounding rect.
+			requestAnimationFrame(recompute);
 		} catch (e) {
 			if (seq !== loadSeq) {
 				console.info("useAssOverlay: ignoring superseded ASS load failure for", url);
