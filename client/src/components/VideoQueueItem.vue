@@ -328,10 +328,6 @@ const voted = ref(false);
 const showEditDialog = ref(false);
 const editedSubtitleUrl = props.isPreview ? ref("") : ref(item.value.subtitleUrl);
 
-// The default subtitle track select binds directly to the queue item's value: `null`
-// means no default subtitle, a URL is the manifest track to show by default. The
-// available tracks come straight from the item metadata (the server bakes the
-// manifest's `textTracks` into it), so no manifest fetch is needed here.
 const isManifestItem = computed(() => item.value.mime === "application/json");
 const editedDefaultTrack = ref<string | null>(null);
 const manifestTracks = computed<CustomMediaTextTrack[]>(() => item.value.textTracks ?? []);
@@ -377,9 +373,6 @@ function getPostData(): VideoAdd {
 		// Use `item.value.*` for preview since the edited refs might not be saved yet
 		subtitleUrl:
 			(props.isPreview ? item.value.subtitleUrl : editedSubtitleUrl.value) ?? undefined,
-		// A URL selects that manifest track; `null` means "no subtitles". For manifest
-		// items the server has already resolved a concrete default, so this only ever
-		// carries an explicit choice from the edit dialog (or the preview's own value).
 		defaultSubtitleTrack: props.isPreview
 			? item.value.defaultSubtitleTrack
 			: editedDefaultTrack.value,
@@ -395,9 +388,6 @@ watch(showEditDialog, open => {
 	if (!props.isPreview) {
 		editedSubtitleUrl.value = item.value.subtitleUrl ?? "";
 	}
-	// A URL selects that track, `null` means "no subtitles". The server resolves the
-	// manifest's own default into a concrete value before items reach the client, so
-	// there's nothing left to resolve here.
 	editedDefaultTrack.value = item.value.defaultSubtitleTrack ?? null;
 });
 
