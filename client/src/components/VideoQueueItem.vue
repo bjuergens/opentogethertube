@@ -394,7 +394,10 @@ function getPostData(): VideoAdd {
 		// Use `item.value.*` for preview since the edited refs might not be saved yet
 		subtitleUrl:
 			(props.isPreview ? item.value.subtitleUrl : editedSubtitleUrl.value) ?? undefined,
-		defaultSubtitleTrack: props.isPreview ? item.value.defaultSubtitleTrack : editedTrack,
+		// Normalize absent tracks to `null` so preview and edit posts agree on the
+		// canonical "use the manifest's default flag" representation.
+		defaultSubtitleTrack:
+			(props.isPreview ? item.value.defaultSubtitleTrack : editedTrack) ?? null,
 	};
 	return data;
 }
@@ -421,18 +424,15 @@ watch(showEditDialog, async open => {
 		isLoadingManifest.value = true;
 		manifestError.value = false;
 		try {
-			const response = await fetch(item.value.src_url ?? item.value.id);
-			if (!response.ok) {
-				throw new Error(`failed to fetch manifest: ${response.status}`);
-			}
-			const manifest = (await response.json()) as CustomMediaManifest;
-			manifestTracks.value = manifest.textTracks ?? [];
+			const resp = await axios.get<CustomMediaManifest>(item.value.src_url ?? item.value.id);
+			manifestTracks.value = resp.data.textTracks ?? [];
 		} catch (e) {
 			console.error("VideoQueueItem: failed to load manifest tracks:", e);
 			manifestError.value = true;
 			manifestTracks.value = [];
+		} finally {
+			isLoadingManifest.value = false;
 		}
-		isLoadingManifest.value = false;
 	}
 });
 
