@@ -202,9 +202,6 @@
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem :value="TRACK_MANIFEST_DEFAULT">
-								{{ $t("video-queue-item.edit.manifest-default") }}
-							</SelectItem>
 							<SelectItem :value="TRACK_NONE">
 								{{ $t("video-queue-item.edit.no-subtitles") }}
 							</SelectItem>
@@ -335,12 +332,12 @@ const voted = ref(false);
 const showEditDialog = ref(false);
 const editedSubtitleUrl = props.isPreview ? ref("") : ref(item.value.subtitleUrl);
 
-// Sentinel values for the default subtitle track select. `null`/absent on the queue
-// item means "use the manifest's default flag", `""` means "no subtitles".
-const TRACK_MANIFEST_DEFAULT = "\0manifest-default";
+// Sentinel value for the "no subtitles" option in the default subtitle track select.
+// On the queue item, a `null`/absent `defaultSubtitleTrack` means no default subtitle;
+// a non-empty value is the URL of the manifest track to show by default.
 const TRACK_NONE = "\0none";
 const isManifestItem = computed(() => item.value.mime === "application/json");
-const editedDefaultTrack = ref(TRACK_MANIFEST_DEFAULT);
+const editedDefaultTrack = ref(TRACK_NONE);
 const manifestTracks = ref<CustomMediaTextTrack[]>([]);
 const manifestError = ref(false);
 const isLoadingManifest = ref(false);
@@ -380,22 +377,16 @@ function updateHasBeenAdded() {
 }
 
 function getPostData(): VideoAdd {
-	// Convert the select's sentinel values back to the queue item representation:
-	// `null` means "use the manifest's default flag", `""` means "no subtitles".
-	let editedTrack: string | null = editedDefaultTrack.value;
-	if (editedTrack === TRACK_MANIFEST_DEFAULT) {
-		editedTrack = null;
-	} else if (editedTrack === TRACK_NONE) {
-		editedTrack = "";
-	}
+	// The select uses TRACK_NONE for "no subtitles"; map it back to `null`. Any other
+	// value is the URL of the manifest track to show by default.
+	const editedTrack = editedDefaultTrack.value === TRACK_NONE ? null : editedDefaultTrack.value;
 	const data: VideoAdd = {
 		service: item.value.service,
 		id: item.value.id,
 		// Use `item.value.*` for preview since the edited refs might not be saved yet
 		subtitleUrl:
 			(props.isPreview ? item.value.subtitleUrl : editedSubtitleUrl.value) ?? undefined,
-		// Normalize absent tracks to `null` so preview and edit posts agree on the
-		// canonical "use the manifest's default flag" representation.
+		// Normalize an absent track to `null` so preview and edit posts agree.
 		defaultSubtitleTrack:
 			(props.isPreview ? item.value.defaultSubtitleTrack : editedTrack) ?? null,
 	};
@@ -410,16 +401,9 @@ watch(showEditDialog, async open => {
 	if (!props.isPreview) {
 		editedSubtitleUrl.value = item.value.subtitleUrl ?? "";
 	}
-	// Map the queue item's track value to the select's sentinel values: `null`/absent
-	// means "use the manifest's default flag", `""` means "no subtitles".
-	const track = item.value.defaultSubtitleTrack;
-	if (track === null || track === undefined) {
-		editedDefaultTrack.value = TRACK_MANIFEST_DEFAULT;
-	} else if (track === "") {
-		editedDefaultTrack.value = TRACK_NONE;
-	} else {
-		editedDefaultTrack.value = track;
-	}
+	// Map the queue item's track to the select value. A non-empty value selects that
+	// track; `null`/absent (no default subtitle) selects "no subtitles".
+	editedDefaultTrack.value = item.value.defaultSubtitleTrack || TRACK_NONE;
 	if (isManifestItem.value) {
 		isLoadingManifest.value = true;
 		manifestError.value = false;
@@ -438,15 +422,10 @@ watch(showEditDialog, async open => {
 
 async function saveEdit() {
 	if (props.isPreview) {
-		// Update the subtitle settings for playNow(). Convert the select's sentinel
-		// values back: `null` means "use the manifest's default flag", `""` means
-		// "no subtitles".
-		let editedTrack: string | null = editedDefaultTrack.value;
-		if (editedTrack === TRACK_MANIFEST_DEFAULT) {
-			editedTrack = null;
-		} else if (editedTrack === TRACK_NONE) {
-			editedTrack = "";
-		}
+		// Update the subtitle settings for playNow(). TRACK_NONE maps back to `null`
+		// (no default subtitle); any other value is the selected track URL.
+		const editedTrack =
+			editedDefaultTrack.value === TRACK_NONE ? null : editedDefaultTrack.value;
 		item.value.subtitleUrl = editedSubtitleUrl.value ?? undefined;
 		item.value.defaultSubtitleTrack = editedTrack;
 		showEditDialog.value = false;

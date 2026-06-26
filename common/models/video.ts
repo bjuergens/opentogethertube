@@ -28,7 +28,7 @@ export interface QueueItemExtras {
 	subtitleUrl?: string;
 	/**
 	 * URL of the text track that should be selected by default for all viewers.
-	 * `""` means no subtitles by default, `null` or absent means use the manifest's default flag.
+	 * `null` or absent means no subtitles are shown by default.
 	 */
 	defaultSubtitleTrack?: string | null;
 }
