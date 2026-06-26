@@ -345,49 +345,12 @@ const manifestTracks = ref<CustomMediaTextTrack[]>([]);
 const manifestError = ref(false);
 const isLoadingManifest = ref(false);
 
-function trackToSelectValue(track: string | null | undefined): string {
-	if (track === null || track === undefined) {
-		return TRACK_MANIFEST_DEFAULT;
-	}
-	if (track === "") {
-		return TRACK_NONE;
-	}
-	return track;
-}
-
-function selectValueToTrack(value: string): string | null {
-	if (value === TRACK_MANIFEST_DEFAULT) {
-		return null;
-	}
-	if (value === TRACK_NONE) {
-		return "";
-	}
-	return value;
-}
-
 function formatTrackLabel(track: CustomMediaTextTrack): string {
 	const name = track.name ?? track.srclang;
 	const format = track.contentType === "text/x-ass" ? "ASS" : "VTT";
 	return `${name} [${track.srclang}] (${format})`;
 }
 
-async function loadManifestTracks() {
-	isLoadingManifest.value = true;
-	manifestError.value = false;
-	try {
-		const response = await fetch(item.value.src_url ?? item.value.id);
-		if (!response.ok) {
-			throw new Error(`failed to fetch manifest: ${response.status}`);
-		}
-		const manifest = (await response.json()) as CustomMediaManifest;
-		manifestTracks.value = manifest.textTracks ?? [];
-	} catch (e) {
-		console.error("VideoQueueItem: failed to load manifest tracks:", e);
-		manifestError.value = true;
-		manifestTracks.value = [];
-	}
-	isLoadingManifest.value = false;
-}
 const videoLength = computed(() => secondsToTimestamp(item.value?.length ?? 0));
 const videoStartAt = computed(() => secondsToTimestamp(item.value?.startAt ?? 0));
 const thumbnailSource = computed(() => {
@@ -417,38 +380,75 @@ function updateHasBeenAdded() {
 }
 
 function getPostData(): VideoAdd {
+	// Convert the select's sentinel values back to the queue item representation:
+	// `null` means "use the manifest's default flag", `""` means "no subtitles".
+	let editedTrack: string | null = editedDefaultTrack.value;
+	if (editedTrack === TRACK_MANIFEST_DEFAULT) {
+		editedTrack = null;
+	} else if (editedTrack === TRACK_NONE) {
+		editedTrack = "";
+	}
 	const data: VideoAdd = {
 		service: item.value.service,
 		id: item.value.id,
 		// Use `item.value.*` for preview since the edited refs might not be saved yet
 		subtitleUrl:
 			(props.isPreview ? item.value.subtitleUrl : editedSubtitleUrl.value) ?? undefined,
-		defaultSubtitleTrack: props.isPreview
-			? item.value.defaultSubtitleTrack
-			: selectValueToTrack(editedDefaultTrack.value),
+		defaultSubtitleTrack: props.isPreview ? item.value.defaultSubtitleTrack : editedTrack,
 	};
 	return data;
 }
 
 // Ensure that the edited values reflect the current item state when the dialog opens
-watch(showEditDialog, open => {
+watch(showEditDialog, async open => {
 	if (!open) {
 		return;
 	}
 	if (!props.isPreview) {
 		editedSubtitleUrl.value = item.value.subtitleUrl ?? "";
 	}
-	editedDefaultTrack.value = trackToSelectValue(item.value.defaultSubtitleTrack);
+	// Map the queue item's track value to the select's sentinel values: `null`/absent
+	// means "use the manifest's default flag", `""` means "no subtitles".
+	const track = item.value.defaultSubtitleTrack;
+	if (track === null || track === undefined) {
+		editedDefaultTrack.value = TRACK_MANIFEST_DEFAULT;
+	} else if (track === "") {
+		editedDefaultTrack.value = TRACK_NONE;
+	} else {
+		editedDefaultTrack.value = track;
+	}
 	if (isManifestItem.value) {
-		loadManifestTracks();
+		isLoadingManifest.value = true;
+		manifestError.value = false;
+		try {
+			const response = await fetch(item.value.src_url ?? item.value.id);
+			if (!response.ok) {
+				throw new Error(`failed to fetch manifest: ${response.status}`);
+			}
+			const manifest = (await response.json()) as CustomMediaManifest;
+			manifestTracks.value = manifest.textTracks ?? [];
+		} catch (e) {
+			console.error("VideoQueueItem: failed to load manifest tracks:", e);
+			manifestError.value = true;
+			manifestTracks.value = [];
+		}
+		isLoadingManifest.value = false;
 	}
 });
 
 async function saveEdit() {
 	if (props.isPreview) {
-		// Update the subtitle settings for playNow()
+		// Update the subtitle settings for playNow(). Convert the select's sentinel
+		// values back: `null` means "use the manifest's default flag", `""` means
+		// "no subtitles".
+		let editedTrack: string | null = editedDefaultTrack.value;
+		if (editedTrack === TRACK_MANIFEST_DEFAULT) {
+			editedTrack = null;
+		} else if (editedTrack === TRACK_NONE) {
+			editedTrack = "";
+		}
 		item.value.subtitleUrl = editedSubtitleUrl.value ?? undefined;
-		item.value.defaultSubtitleTrack = selectValueToTrack(editedDefaultTrack.value);
+		item.value.defaultSubtitleTrack = editedTrack;
 		showEditDialog.value = false;
 	} else {
 		isLoadingEdit.value = true;
