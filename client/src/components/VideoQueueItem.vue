@@ -202,7 +202,7 @@
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem :value="TRACK_NONE">
+							<SelectItem :value="null">
 								{{ $t("video-queue-item.edit.no-subtitles") }}
 							</SelectItem>
 							<SelectItem
@@ -332,12 +332,10 @@ const voted = ref(false);
 const showEditDialog = ref(false);
 const editedSubtitleUrl = props.isPreview ? ref("") : ref(item.value.subtitleUrl);
 
-// Sentinel value for the "no subtitles" option in the default subtitle track select.
-// On the queue item, a `null`/absent `defaultSubtitleTrack` means no default subtitle;
-// a non-empty value is the URL of the manifest track to show by default.
-const TRACK_NONE = "\0none";
+// The default subtitle track select binds directly to the queue item's value: `null`
+// means no default subtitle, a URL is the manifest track to show by default.
 const isManifestItem = computed(() => item.value.mime === "application/json");
-const editedDefaultTrack = ref(TRACK_NONE);
+const editedDefaultTrack = ref<string | null>(null);
 const manifestTracks = ref<CustomMediaTextTrack[]>([]);
 const manifestError = ref(false);
 const isLoadingManifest = ref(false);
@@ -383,9 +381,6 @@ function updateHasBeenAdded() {
 }
 
 function getPostData(): VideoAdd {
-	// The select uses TRACK_NONE for "no subtitles"; map it back to `null`. Any other
-	// value is the URL of the manifest track to show by default.
-	const editedTrack = editedDefaultTrack.value === TRACK_NONE ? null : editedDefaultTrack.value;
 	const data: VideoAdd = {
 		service: item.value.service,
 		id: item.value.id,
@@ -394,7 +389,7 @@ function getPostData(): VideoAdd {
 			(props.isPreview ? item.value.subtitleUrl : editedSubtitleUrl.value) ?? undefined,
 		// Normalize an absent track to `null` so preview and edit posts agree.
 		defaultSubtitleTrack:
-			(props.isPreview ? item.value.defaultSubtitleTrack : editedTrack) ?? null,
+			(props.isPreview ? item.value.defaultSubtitleTrack : editedDefaultTrack.value) ?? null,
 	};
 	return data;
 }
@@ -407,11 +402,11 @@ watch(showEditDialog, async open => {
 	if (!props.isPreview) {
 		editedSubtitleUrl.value = item.value.subtitleUrl ?? "";
 	}
-	// Map the queue item's track to the select value: a URL selects that track, an
-	// explicit `null` selects "no subtitles". `undefined` (never set) is provisionally
-	// "no subtitles" but gets resolved to the manifest's default track once it loads.
+	// A stored URL selects that track, `null` means "no subtitles". `undefined` (never
+	// set) is provisionally "no subtitles" but gets resolved to the manifest's default
+	// track once it loads.
 	const storedTrack = item.value.defaultSubtitleTrack;
-	editedDefaultTrack.value = storedTrack ? storedTrack : TRACK_NONE;
+	editedDefaultTrack.value = storedTrack ?? null;
 	if (isManifestItem.value) {
 		isLoadingManifest.value = true;
 		manifestError.value = false;
@@ -420,8 +415,7 @@ watch(showEditDialog, async open => {
 			manifestTracks.value = manifest.textTracks ?? [];
 			// Start an unset item from the manifest's own default track, if it has one.
 			if (storedTrack === undefined) {
-				const def = manifestTracks.value.find(t => t.default);
-				editedDefaultTrack.value = def ? def.url : TRACK_NONE;
+				editedDefaultTrack.value = manifestTracks.value.find(t => t.default)?.url ?? null;
 			}
 		} catch (e) {
 			console.error("VideoQueueItem: failed to load manifest tracks:", e);
@@ -435,12 +429,9 @@ watch(showEditDialog, async open => {
 
 async function saveEdit() {
 	if (props.isPreview) {
-		// Update the subtitle settings for playNow(). TRACK_NONE maps back to `null`
-		// (no default subtitle); any other value is the selected track URL.
-		const editedTrack =
-			editedDefaultTrack.value === TRACK_NONE ? null : editedDefaultTrack.value;
+		// Update the subtitle settings for playNow().
 		item.value.subtitleUrl = editedSubtitleUrl.value ?? undefined;
-		item.value.defaultSubtitleTrack = editedTrack;
+		item.value.defaultSubtitleTrack = editedDefaultTrack.value;
 		showEditDialog.value = false;
 	} else {
 		isLoadingEdit.value = true;
