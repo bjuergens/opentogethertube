@@ -143,7 +143,6 @@ import { ToastStyle } from "@/models/toast";
 import toast from "@/util/toast";
 import type { Video } from "ott-common/models/video";
 import type { OttResponseBody, OttApiResponseAddPreview } from "ott-common/models/rest-api";
-import type { CustomMediaManifest } from "ott-common/models/zod-schemas";
 import axios from "axios";
 import AddPreviewHelper from "./AddPreviewHelper.vue";
 import { ALL_VIDEO_SERVICES } from "ott-common/constants";
@@ -356,23 +355,6 @@ async function requestAddPreviewExplicit() {
 async function addAllToQueue() {
 	isLoadingAddAll.value = true;
 	try {
-		// Bake each manifest item's default subtitle track into it before adding. Items
-		// with an already-set track (a URL or an explicit `null`) are left untouched.
-		await Promise.all(
-			videos.value.map(async video => {
-				if (video.mime !== "application/json" || video.defaultSubtitleTrack !== undefined) {
-					return;
-				}
-				try {
-					const resp = await axios.get<CustomMediaManifest>(video.src_url ?? video.id);
-					video.defaultSubtitleTrack =
-						resp.data.textTracks?.find(t => t.default)?.url ?? null;
-				} catch (e) {
-					console.error("AddPreview: failed to resolve manifest default track:", e);
-					video.defaultSubtitleTrack = null;
-				}
-			}),
-		);
 		await API.post(`/room/${route.params.roomId}/queue`, { videos: videos.value });
 	} catch (err) {
 		let message = `${err}`;

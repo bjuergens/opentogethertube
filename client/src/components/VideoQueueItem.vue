@@ -190,11 +190,7 @@
 					<FieldLabel for="edit-default-subtitle-track">
 						{{ $t("video-queue-item.edit.default-subtitle-track") }}
 					</FieldLabel>
-					<Spinner v-if="isLoadingManifest" class="size-4" />
-					<FieldDescription v-else-if="manifestError">
-						{{ $t("video-queue-item.edit.manifest-load-failed") }}
-					</FieldDescription>
-					<Select v-else v-model="editedDefaultTrack">
+					<Select v-model="editedDefaultTrack">
 						<SelectTrigger
 							id="edit-default-subtitle-track"
 							data-cy="edit-default-subtitle-track"
@@ -214,7 +210,7 @@
 							</SelectItem>
 						</SelectContent>
 					</Select>
-					<FieldDescription v-if="!manifestError">
+					<FieldDescription>
 						{{ $t("video-queue-item.edit.default-subtitle-track-hint") }}
 					</FieldDescription>
 				</Field>
@@ -292,7 +288,7 @@ import { API } from "@/common-http";
 import { secondsToTimestamp } from "@/util/timestamp";
 import { ToastStyle } from "@/models/toast";
 import type { QueueItem, VideoAdd } from "ott-common/models/video";
-import type { CustomMediaManifest, CustomMediaTextTrack } from "ott-common/models/zod-schemas";
+import type { CustomMediaTextTrack } from "ott-common/models/zod-schemas";
 import { QueueMode } from "ott-common/models/types";
 import { useStore } from "@/store";
 import toast from "@/util/toast";
@@ -333,12 +329,12 @@ const showEditDialog = ref(false);
 const editedSubtitleUrl = props.isPreview ? ref("") : ref(item.value.subtitleUrl);
 
 // The default subtitle track select binds directly to the queue item's value: `null`
-// means no default subtitle, a URL is the manifest track to show by default.
+// means no default subtitle, a URL is the manifest track to show by default. The
+// available tracks come straight from the item metadata (the server bakes the
+// manifest's `textTracks` into it), so no manifest fetch is needed here.
 const isManifestItem = computed(() => item.value.mime === "application/json");
 const editedDefaultTrack = ref<string | null>(null);
-const manifestTracks = ref<CustomMediaTextTrack[]>([]);
-const manifestError = ref(false);
-const isLoadingManifest = ref(false);
+const manifestTracks = computed<CustomMediaTextTrack[]>(() => item.value.textTracks ?? []);
 
 function formatTrackLabel(track: CustomMediaTextTrack): string {
 	const name = track.name ?? track.srclang;
@@ -381,8 +377,9 @@ function getPostData(): VideoAdd {
 		// Use `item.value.*` for preview since the edited refs might not be saved yet
 		subtitleUrl:
 			(props.isPreview ? item.value.subtitleUrl : editedSubtitleUrl.value) ?? undefined,
-		// Leave the track absent (undefined) when unset so it's omitted from the request;
-		// a URL or an explicit `null` ("no subtitles") is sent as-is.
+		// A URL selects that manifest track; `null` means "no subtitles". For manifest
+		// items the server has already resolved a concrete default, so this only ever
+		// carries an explicit choice from the edit dialog (or the preview's own value).
 		defaultSubtitleTrack: props.isPreview
 			? item.value.defaultSubtitleTrack
 			: editedDefaultTrack.value,
@@ -391,36 +388,17 @@ function getPostData(): VideoAdd {
 }
 
 // Ensure that the edited values reflect the current item state when the dialog opens
-watch(showEditDialog, async open => {
+watch(showEditDialog, open => {
 	if (!open) {
 		return;
 	}
 	if (!props.isPreview) {
 		editedSubtitleUrl.value = item.value.subtitleUrl ?? "";
 	}
-	// A stored URL selects that track, `null` means "no subtitles". `undefined` (never
-	// set) is provisionally "no subtitles" but gets resolved to the manifest's default
-	// track once it loads.
-	const storedTrack = item.value.defaultSubtitleTrack;
-	editedDefaultTrack.value = storedTrack ?? null;
-	if (isManifestItem.value) {
-		isLoadingManifest.value = true;
-		manifestError.value = false;
-		try {
-			const resp = await axios.get<CustomMediaManifest>(item.value.src_url ?? item.value.id);
-			manifestTracks.value = resp.data.textTracks ?? [];
-			// Start an unset item from the manifest's own default track, if it has one.
-			if (storedTrack === undefined) {
-				editedDefaultTrack.value = resp.data.textTracks?.find(t => t.default)?.url ?? null;
-			}
-		} catch (e) {
-			console.error("VideoQueueItem: failed to load manifest tracks:", e);
-			manifestError.value = true;
-			manifestTracks.value = [];
-		} finally {
-			isLoadingManifest.value = false;
-		}
-	}
+	// A URL selects that track, `null` means "no subtitles". The server resolves the
+	// manifest's own default into a concrete value before items reach the client, so
+	// there's nothing left to resolve here.
+	editedDefaultTrack.value = item.value.defaultSubtitleTrack ?? null;
 });
 
 async function saveEdit() {
@@ -457,21 +435,6 @@ async function saveEdit() {
 async function addToQueue() {
 	isLoadingAdd.value = true;
 	try {
-		// Bake the manifest's default track into the item before adding so viewers get it
-		// by default. `undefined` means never set; an explicit `null` ("no subtitles") or
-		// a URL is preserved.
-		if (isManifestItem.value && item.value.defaultSubtitleTrack === undefined) {
-			try {
-				const manifestResp = await axios.get<CustomMediaManifest>(
-					item.value.src_url ?? item.value.id,
-				);
-				item.value.defaultSubtitleTrack =
-					manifestResp.data.textTracks?.find(t => t.default)?.url ?? null;
-			} catch (e) {
-				console.error("VideoQueueItem: failed to resolve manifest default track:", e);
-				item.value.defaultSubtitleTrack = null;
-			}
-		}
 		const resp = await API.post(`/room/${store.state.room.name}/queue`, getPostData());
 		hasError.value = !resp.data.success;
 		hasBeenAdded.value = true;

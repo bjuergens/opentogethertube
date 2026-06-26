@@ -134,6 +134,10 @@ export default class DirectVideoAdapter extends ServiceAdapter {
 			length: Math.ceil(manifest.duration),
 			thumbnail: manifest.thumbnail,
 			mime: "application/json",
+			textTracks: manifest.textTracks,
+			// Resolve the manifest's default track once, here, so every consumer
+			// downstream sees a concrete value (a track URL, or `null`).
+			defaultSubtitleTrack: manifest.textTracks?.find(t => t.default)?.url ?? null,
 		};
 	}
 
