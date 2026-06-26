@@ -292,8 +292,7 @@ import { API } from "@/common-http";
 import { secondsToTimestamp } from "@/util/timestamp";
 import { ToastStyle } from "@/models/toast";
 import type { QueueItem, VideoAdd } from "ott-common/models/video";
-import type { CustomMediaTextTrack } from "ott-common/models/zod-schemas";
-import { fetchManifest, defaultTrackUrl, bakeDefaultSubtitleTrack } from "@/util/manifest";
+import type { CustomMediaManifest, CustomMediaTextTrack } from "ott-common/models/zod-schemas";
 import { QueueMode } from "ott-common/models/types";
 import { useStore } from "@/store";
 import toast from "@/util/toast";
@@ -408,11 +407,11 @@ watch(showEditDialog, async open => {
 		isLoadingManifest.value = true;
 		manifestError.value = false;
 		try {
-			const manifest = await fetchManifest(item.value.src_url ?? item.value.id);
-			manifestTracks.value = manifest.textTracks ?? [];
+			const resp = await axios.get<CustomMediaManifest>(item.value.src_url ?? item.value.id);
+			manifestTracks.value = resp.data.textTracks ?? [];
 			// Start an unset item from the manifest's own default track, if it has one.
 			if (storedTrack === undefined) {
-				editedDefaultTrack.value = defaultTrackUrl(manifest);
+				editedDefaultTrack.value = resp.data.textTracks?.find(t => t.default)?.url ?? null;
 			}
 		} catch (e) {
 			console.error("VideoQueueItem: failed to load manifest tracks:", e);
@@ -458,8 +457,21 @@ async function saveEdit() {
 async function addToQueue() {
 	isLoadingAdd.value = true;
 	try {
-		// Resolve the manifest's default subtitle track into the item before adding.
-		await bakeDefaultSubtitleTrack(item.value);
+		// Bake the manifest's default track into the item before adding so viewers get it
+		// by default. `undefined` means never set; an explicit `null` ("no subtitles") or
+		// a URL is preserved.
+		if (isManifestItem.value && item.value.defaultSubtitleTrack === undefined) {
+			try {
+				const manifestResp = await axios.get<CustomMediaManifest>(
+					item.value.src_url ?? item.value.id,
+				);
+				item.value.defaultSubtitleTrack =
+					manifestResp.data.textTracks?.find(t => t.default)?.url ?? null;
+			} catch (e) {
+				console.error("VideoQueueItem: failed to resolve manifest default track:", e);
+				item.value.defaultSubtitleTrack = null;
+			}
+		}
 		const resp = await API.post(`/room/${store.state.room.name}/queue`, getPostData());
 		hasError.value = !resp.data.success;
 		hasBeenAdded.value = true;
