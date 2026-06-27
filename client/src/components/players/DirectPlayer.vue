@@ -161,15 +161,14 @@ function textTrack(idx: number) {
 }
 
 /**
- * Maps a text track index to its index in the native videoElem.textTracks list,
- * which only contains the VTT tracks. Returns -1 for non-VTT tracks.
+ * Resolves the native TextTrack backing a VTT track url. Only VTT tracks are
+ * rendered as <track> elements, so ASS (and unknown) urls return undefined.
+ * Keying off the <track src> avoids mapping unified indices onto the VTT-only
+ * native list.
  */
-function nativeTrackIndex(idx: number): number {
-	const tracks = textTracks.value;
-	if (tracks[idx]?.contentType !== "text/vtt") {
-		return -1;
-	}
-	return tracks.slice(0, idx).filter(t => t.contentType === "text/vtt").length;
+function nativeTrackFor(url: string): TextTrack | undefined {
+	const el = videoElem.value?.querySelector<HTMLTrackElement>(`track[src="${CSS.escape(url)}"]`);
+	return el?.track ?? undefined;
 }
 
 /**
@@ -209,8 +208,10 @@ function setCaptionsEnabled(enabled: boolean): void {
 		}
 		return;
 	}
-	const nativeIdx = nativeTrackIndex(captions.currentTrack.value);
-	videoElem.value.textTracks[nativeIdx].mode = enabled ? "showing" : "hidden";
+	const native = nativeTrackFor(track.url);
+	if (native) {
+		native.mode = enabled ? "showing" : "hidden";
+	}
 }
 
 function isCaptionsEnabled(): boolean {
@@ -246,9 +247,10 @@ function setCaptionsTrack(track: number): void {
 		console.warn("DirectPlayer: invalid captions track index:", track);
 		return;
 	}
-	const nativeIdx = nativeTrackIndex(track);
-	for (let i = 0; i < videoElem.value.textTracks.length; i++) {
-		videoElem.value.textTracks[i].mode = i === nativeIdx ? "showing" : "hidden";
+	const selectedNative =
+		selected.contentType === "text/vtt" ? nativeTrackFor(selected.url) : undefined;
+	for (const native of Array.from(videoElem.value.textTracks)) {
+		native.mode = native === selectedNative ? "showing" : "hidden";
 	}
 	if (selected.contentType === "text/x-ass") {
 		activateAssTrack(track);
@@ -393,7 +395,10 @@ async function loadVideoSource() {
 			activateAssTrack(defaultTrackIdx);
 		} else {
 			await nextTick();
-			videoElem.value.textTracks[nativeTrackIndex(defaultTrackIdx)].mode = "showing";
+			const native = nativeTrackFor(textTrack(defaultTrackIdx).url);
+			if (native) {
+				native.mode = "showing";
+			}
 		}
 	}
 
