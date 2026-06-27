@@ -58,39 +58,42 @@ export function useAssOverlay(
 				throw new Error(`HTTP ${response.status}`);
 			}
 			const content = await response.text();
+			// A newer load() or a destroy() superseded this one while we were fetching;
+			// silently drop it (this is normal when switching tracks quickly).
 			if (seq !== loadSeq) {
-				console.warn("useAssOverlay: discarding stale ASS load for", url);
 				return;
 			}
 			await waitForDimensions(video);
 			if (seq !== loadSeq) {
-				console.warn("useAssOverlay: discarding stale ASS load for", url);
 				return;
 			}
 			instance = new ASS(content, video, { container: box });
 			visible.value = true;
 		} catch (e) {
+			// A superseded load that happens to fail is not interesting. Only surface the
+			// failure of the load that is still current, and let the caller react to it.
 			if (seq !== loadSeq) {
-				console.info("useAssOverlay: ignoring superseded ASS load failure for", url);
 				return;
 			}
-			console.error("useAssOverlay: failed to load ASS subtitles:", e);
 			currentUrl = null;
+			throw e;
 		}
 	}
 
 	function load(url: string): Promise<void> {
 		const video = videoElement.value;
 		const box = container.value;
+		// Reject rather than throw synchronously so every failure mode reaches the caller's
+		// async error handling uniformly (callers invoke load() fire-and-forget).
 		if (!video || !box) {
-			throw new Error("useAssOverlay.load() called before the video element was mounted");
+			return Promise.reject(
+				new Error("useAssOverlay.load() called before the video element was mounted"),
+			);
 		}
+		// Already loaded or still loading this exact track; just make sure it's visible.
 		if (currentUrl === url) {
 			if (instance) {
-				console.info("useAssOverlay: track already active, ensuring visible:", url);
 				show();
-			} else {
-				console.info("useAssOverlay: track already loading:", url);
 			}
 			return Promise.resolve();
 		}

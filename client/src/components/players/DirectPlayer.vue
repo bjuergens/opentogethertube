@@ -153,7 +153,16 @@ function activateAssTrack(idx: number): Promise<void> {
 	if (!track) {
 		return Promise.resolve();
 	}
-	return assOverlay.load(track.url);
+	return assOverlay.load(track.url).catch(e => {
+		console.error("DirectPlayer: failed to activate ASS subtitles:", e);
+		// The selected track can't render. If it's still the current selection (i.e. the
+		// user hasn't since picked another track), reflect "no captions" in the UI so the
+		// menu doesn't show a track as active while nothing is displayed.
+		if (captions.currentTrack.value === idx) {
+			captions.currentTrack.value = -1;
+			captions.isCaptionsEnabled.value = false;
+		}
+	});
 }
 
 function setCaptionsEnabled(enabled: boolean): void {
@@ -362,9 +371,12 @@ async function loadVideoSource() {
 			activateAssTrack(defaultTrackIdx);
 		} else {
 			await nextTick();
-			const native = nativeTrackFor(textTrackAt(defaultTrackIdx).url);
+			const url = textTrackAt(defaultTrackIdx).url;
+			const native = nativeTrackFor(url);
 			if (native) {
 				native.mode = "showing";
+			} else {
+				console.warn("DirectPlayer: default subtitle track element not found:", url);
 			}
 		}
 	}
