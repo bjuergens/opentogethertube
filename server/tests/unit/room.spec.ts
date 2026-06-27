@@ -316,7 +316,7 @@ describe("Room", () => {
 				});
 			});
 
-			it("should default defaultSubtitleTrack to \"\" when omitted", async () => {
+			it("should default defaultSubtitleTrack to null when omitted", async () => {
 				vi.spyOn(infoextractor, "getVideoInfo").mockResolvedValue(videoToAdd);
 
 				await room.processUnauthorizedRequest(
@@ -330,7 +330,7 @@ describe("Room", () => {
 				expect(room.queue).toHaveLength(1);
 				expect(room.queue.items[0]).toEqual({
 					...videoToAdd,
-					defaultSubtitleTrack: "",
+					defaultSubtitleTrack: null,
 				});
 			});
 
@@ -358,7 +358,7 @@ describe("Room", () => {
 							id: "first",
 							defaultSubtitleTrack: "https://example.com/first.vtt",
 						}),
-						expect.objectContaining({ id: "second", defaultSubtitleTrack: "" }),
+						expect.objectContaining({ id: "second", defaultSubtitleTrack: null }),
 					]),
 				);
 			});

@@ -52,15 +52,15 @@ const VideoIdSchema = z.object({
 const QueueItemExtrasSchema = z.object({
 	// startAt: z.number().nonnegative().optional(),
 	// endAt: z.number().positive().optional(),
-	// Empty string means "no default subtitle"; a URL selects a manifest track or an
-	// external subtitle file. `null`/absent are accepted for convenience and
-	// normalized to "" so there is a single canonical "no subtitles" value.
+	// `null` means "no default subtitle"; a URL selects a manifest track or an
+	// external subtitle file. ""/absent are accepted for convenience and normalized
+	// to `null` so there is a single canonical "no subtitles" value.
 	defaultSubtitleTrack: z
 		.string()
 		.url()
 		.or(z.literal(""))
 		.nullish()
-		.transform(value => value ?? ""),
+		.transform(value => value || null),
 });
 
 const VideoAddSchema = VideoIdSchema.extend(QueueItemExtrasSchema.shape);

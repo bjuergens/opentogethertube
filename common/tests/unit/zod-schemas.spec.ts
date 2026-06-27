@@ -100,8 +100,8 @@ describe("defaultSubtitleTrack normalization", () => {
 		["absent", {}],
 		["null", { defaultSubtitleTrack: null }],
 		["empty string", { defaultSubtitleTrack: "" }],
-	])("normalizes %s to \"\"", (_label, input) => {
-		expect(parse(input).defaultSubtitleTrack).toEqual("");
+	])("normalizes %s to null", (_label, input) => {
+		expect(parse(input).defaultSubtitleTrack).toBeNull();
 	});
 
 	it("passes a valid URL through unchanged", () => {

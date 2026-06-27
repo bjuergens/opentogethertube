@@ -502,7 +502,7 @@ describe("Room API", () => {
 			);
 		});
 
-		it("should clear defaultSubtitleTrack to \"\" when sent null", async () => {
+		it("should clear defaultSubtitleTrack to null", async () => {
 			await roommanager.createRoom({
 				name: "testqueue",
 				isTemporary: true,
@@ -534,7 +534,7 @@ describe("Room API", () => {
 					expect.objectContaining({
 						service: "direct",
 						id: "foo",
-						defaultSubtitleTrack: "",
+						defaultSubtitleTrack: null,
 					}),
 				]),
 			);

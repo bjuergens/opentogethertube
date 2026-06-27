@@ -51,10 +51,10 @@ interface Props {
 	/**
 	 * URL of the subtitle track to select by default for all viewers. For manifest
 	 * items it must be one of the manifest's text tracks; for other items it is the
-	 * URL of an external subtitle file. Empty string (or `undefined`) means no
-	 * subtitles are shown by default.
+	 * URL of an external subtitle file. `null`/`undefined` means no subtitles are
+	 * shown by default.
 	 */
-	defaultTrack?: string;
+	defaultTrack?: string | null;
 }
 
 const props = defineProps<Props>();

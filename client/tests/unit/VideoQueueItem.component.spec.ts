@@ -159,7 +159,7 @@ describe("VideoQueueItem component", () => {
 		expect(API.post).toHaveBeenCalledWith("/room/foo/queue", {
 			service: "youtube",
 			id: "1",
-			defaultSubtitleTrack: "",
+			defaultSubtitleTrack: null,
 		});
 	});
 
@@ -197,7 +197,7 @@ describe("VideoQueueItem component", () => {
 		await flush();
 
 		expect(API.delete).toHaveBeenCalledWith("/room/foo/queue", {
-			data: { service: "youtube", id: "1", defaultSubtitleTrack: "" },
+			data: { service: "youtube", id: "1", defaultSubtitleTrack: null },
 		});
 	});
 

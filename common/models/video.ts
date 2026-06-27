@@ -27,9 +27,9 @@ export interface VideoMetadata {
 	 * URL of the subtitle track shown by default for all viewers. For manifest
 	 * items the server resolves this from the manifest's `default` track. For
 	 * non-manifest items it is the URL of an external subtitle file (`.vtt` or
-	 * `.ass`). Empty string (or absent) means "no subtitles".
+	 * `.ass`). `null` (or absent) means "no subtitles".
 	 */
-	defaultSubtitleTrack?: string;
+	defaultSubtitleTrack?: string | null;
 }
 
 export type Video = VideoId & Partial<VideoMetadata>;
@@ -39,9 +39,9 @@ export interface QueueItemExtras {
 	/**
 	 * Sets the default subtitle track for this queue item. For manifest items a
 	 * track URL selects that manifest track; for other items it is the URL of an
-	 * external subtitle file (`.vtt` or `.ass`). Empty string means "no subtitles".
+	 * external subtitle file (`.vtt` or `.ass`). `null` means "no subtitles".
 	 */
-	defaultSubtitleTrack?: string;
+	defaultSubtitleTrack?: string | null;
 }
 
 export type VideoAdd = VideoId & QueueItemExtras;
