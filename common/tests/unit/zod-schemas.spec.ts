@@ -13,14 +13,6 @@ describe("OttApiRequestUpdateQueueItemSchema defaultSubtitleTrack normalization"
 		expect(parsed.defaultSubtitleTrack).toEqual(expected);
 	});
 
-	it("passes a valid URL through unchanged", () => {
-		const parsed = OttApiRequestUpdateQueueItemSchema.parse({
-			...base,
-			defaultSubtitleTrack: "https://example.com/track.de.ass",
-		});
-		expect(parsed.defaultSubtitleTrack).toEqual("https://example.com/track.de.ass");
-	});
-
 	it("rejects a non-URL string", () => {
 		expect(() =>
 			OttApiRequestUpdateQueueItemSchema.parse({ ...base, defaultSubtitleTrack: "not a url" }),

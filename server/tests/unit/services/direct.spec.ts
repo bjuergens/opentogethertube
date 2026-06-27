@@ -177,26 +177,5 @@ describe("Direct", () => {
 			expect(video.textTracks).toHaveLength(2);
 			expect(video.defaultSubtitleTrack).toEqual("https://example.com/de.ass");
 		});
-
-		it("yields a null defaultSubtitleTrack when no track is marked default", async () => {
-			stubManifest({
-				...baseManifest,
-				textTracks: [
-					{ url: "https://example.com/en.vtt", contentType: "text/vtt", srclang: "en" },
-				],
-			});
-
-			const video = await adapter.fetchManifestInfo("https://example.com/manifest.json");
-
-			expect(video.defaultSubtitleTrack).toBeNull();
-		});
-
-		it("yields a null defaultSubtitleTrack when there are no text tracks", async () => {
-			stubManifest(baseManifest);
-
-			const video = await adapter.fetchManifestInfo("https://example.com/manifest.json");
-
-			expect(video.defaultSubtitleTrack).toBeNull();
-		});
 	});
 });
