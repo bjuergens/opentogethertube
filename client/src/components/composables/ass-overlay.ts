@@ -62,21 +62,27 @@ export function useAssOverlay(
 			const content = await response.text();
 			// Superseded by a newer load()/destroy() while fetching; dropping it is normal.
 			if (seq !== loadSeq) {
+				console.debug("useAssOverlay: ASS load superseded after fetch, ignoring:", url);
 				return false;
 			}
 			await waitForDimensions(video);
 			if (seq !== loadSeq) {
+				console.debug(
+					"useAssOverlay: ASS load superseded while awaiting video dimensions, ignoring:",
+					url,
+				);
 				return false;
 			}
 			instance = new ASS(content, video, { container: box });
 			visible.value = true;
 			return true;
 		} catch (e) {
-			// Only report the failure if this load is still the current one.
+			// A superseded load that also failed is no longer current; note it at debug level.
 			if (seq !== loadSeq) {
+				console.debug("useAssOverlay: superseded ASS load failed, ignoring:", url, e);
 				return false;
 			}
-			console.error("useAssOverlay: failed to load ASS subtitles:", e);
+			console.error("useAssOverlay: failed to load ASS subtitles:", url, e);
 			currentUrl = null;
 			return false;
 		}
