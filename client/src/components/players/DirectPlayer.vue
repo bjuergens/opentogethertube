@@ -42,6 +42,7 @@ import type {
 	MediaPlayerWithQuality,
 } from "../composables";
 import { useAssOverlay, useCaptions, useMediaAudioBoost, useQualities } from "../composables";
+import { externalSubtitleAsTextTrack } from "ott-common/subtitle";
 
 interface Props {
 	service: string;
@@ -60,23 +61,15 @@ const qualities = useQualities();
 const manifest = ref<CustomMediaManifest | null>(null);
 const assContainer = ref<HTMLDivElement | undefined>();
 
+// The logical list of subtitle tracks. For manifest items these come from the manifest;
+// for direct items there is a single external track synthesized from defaultSubtitleTrack.
+// Note this includes ASS tracks, which have no <track> DOM element (see nativeTrackFor).
 const textTracks = computed<CustomMediaTextTrack[]>(() => {
 	if (videoMime.value === "application/json") {
 		return manifest.value?.textTracks ?? [];
 	}
 	if (defaultSubtitleTrack.value) {
-		const path = defaultSubtitleTrack.value.split("?")[0].split("#")[0];
-		const ext = path.split(".").pop()?.toLowerCase();
-		const contentType: CustomMediaTextTrack["contentType"] =
-			ext === "ass" || ext === "ssa" ? "text/x-ass" : "text/vtt";
-		return [
-			{
-				url: defaultSubtitleTrack.value,
-				contentType,
-				srclang: "und",
-				default: true,
-			},
-		];
+		return [externalSubtitleAsTextTrack(defaultSubtitleTrack.value)];
 	}
 	return [];
 });
@@ -146,6 +139,10 @@ function textTrackAt(idx: number) {
 	return textTracks.value[idx];
 }
 
+// captions.currentTrack indexes the logical `textTracks` list (which includes ASS tracks),
+// but `videoElem.textTracks` only contains the VTT <track> DOM elements. Those two index
+// spaces diverge whenever an ASS track is present, so native tracks are resolved by URL
+// rather than by index.
 function nativeTrackFor(url: string): TextTrack | undefined {
 	const el = videoElem.value?.querySelector<HTMLTrackElement>(`track[src="${CSS.escape(url)}"]`);
 	return el?.track ?? undefined;

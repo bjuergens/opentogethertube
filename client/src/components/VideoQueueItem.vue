@@ -220,7 +220,8 @@
 					</FieldLabel>
 					<Input
 						id="edit-subtitle-url"
-						v-model="externalSubtitleUrl"
+						:model-value="editedDefaultTrack ?? ''"
+						@update:model-value="setExternalSubtitleUrl(String($event))"
 						class="font-mono"
 						:disabled="!['direct', 'googledrive'].includes(item.service)"
 						data-cy="edit-subtitle-url"
@@ -289,6 +290,7 @@ import { secondsToTimestamp } from "@/util/timestamp";
 import { ToastStyle } from "@/models/toast";
 import type { QueueItem, VideoAdd } from "ott-common/models/video";
 import type { CustomMediaTextTrack } from "ott-common/models/zod-schemas";
+import { normalizeSubtitleTrack } from "ott-common/subtitle";
 import { QueueMode } from "ott-common/models/types";
 import { useStore } from "@/store";
 import toast from "@/util/toast";
@@ -329,12 +331,11 @@ const showEditDialog = ref(false);
 const editedDefaultTrack = ref<string | null>(
 	props.isPreview ? null : item.value.defaultSubtitleTrack ?? null,
 );
-const externalSubtitleUrl = computed<string>({
-	get: () => editedDefaultTrack.value ?? "",
-	set: value => {
-		editedDefaultTrack.value = value || null;
-	},
-});
+// For direct items the subtitle is edited as a plain URL string; collapse "" back to null
+// so the stored value matches the server's normalization.
+function setExternalSubtitleUrl(value: string): void {
+	editedDefaultTrack.value = normalizeSubtitleTrack(value);
+}
 
 const isManifestItem = computed(() => item.value.mime === "application/json");
 const manifestTracks = computed<CustomMediaTextTrack[]>(() => item.value.textTracks ?? []);
