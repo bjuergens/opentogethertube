@@ -32,7 +32,6 @@ export type Video = VideoId & Partial<VideoMetadata>;
 export interface QueueItemExtras {
 	startAt?: number;
 	endAt?: number;
-	/** See {@link VideoMetadata.defaultSubtitleTrack}. */
 	defaultSubtitleTrack?: string | null;
 }
 

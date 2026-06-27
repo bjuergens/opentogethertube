@@ -58,8 +58,7 @@ export function useAssOverlay(
 				throw new Error(`HTTP ${response.status}`);
 			}
 			const content = await response.text();
-			// A newer load() or a destroy() superseded this one while we were fetching;
-			// silently drop it (this is normal when switching tracks quickly).
+			// Superseded by a newer load()/destroy() while fetching; dropping it is normal.
 			if (seq !== loadSeq) {
 				return;
 			}
@@ -70,8 +69,7 @@ export function useAssOverlay(
 			instance = new ASS(content, video, { container: box });
 			visible.value = true;
 		} catch (e) {
-			// A superseded load that happens to fail is not interesting. Only surface the
-			// failure of the load that is still current, and let the caller react to it.
+			// Only surface the failure if this load is still the current one.
 			if (seq !== loadSeq) {
 				return;
 			}
@@ -90,7 +88,6 @@ export function useAssOverlay(
 				new Error("useAssOverlay.load() called before the video element was mounted"),
 			);
 		}
-		// Already loaded or still loading this exact track; just make sure it's visible.
 		if (currentUrl === url) {
 			if (instance) {
 				show();

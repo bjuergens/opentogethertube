@@ -331,8 +331,6 @@ const showEditDialog = ref(false);
 const editedDefaultTrack = ref<string | null>(
 	props.isPreview ? null : item.value.defaultSubtitleTrack ?? null,
 );
-// For direct items the subtitle is edited as a plain URL string; collapse "" back to null
-// so the stored value matches the server's normalization.
 function setExternalSubtitleUrl(value: string): void {
 	editedDefaultTrack.value = normalizeSubtitleTrack(value);
 }

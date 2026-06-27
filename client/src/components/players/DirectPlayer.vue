@@ -61,9 +61,7 @@ const qualities = useQualities();
 const manifest = ref<CustomMediaManifest | null>(null);
 const assContainer = ref<HTMLDivElement | undefined>();
 
-// The logical list of subtitle tracks. For manifest items these come from the manifest;
-// for direct items there is a single external track synthesized from defaultSubtitleTrack.
-// Note this includes ASS tracks, which have no <track> DOM element (see nativeTrackFor).
+// Note: this list includes ASS tracks, which have no <track> DOM element (see nativeTrackFor).
 const textTracks = computed<CustomMediaTextTrack[]>(() => {
 	if (videoMime.value === "application/json") {
 		return manifest.value?.textTracks ?? [];
@@ -155,9 +153,8 @@ function activateAssTrack(idx: number): Promise<void> {
 	}
 	return assOverlay.load(track.url).catch(e => {
 		console.error("DirectPlayer: failed to activate ASS subtitles:", e);
-		// The selected track can't render. If it's still the current selection (i.e. the
-		// user hasn't since picked another track), reflect "no captions" in the UI so the
-		// menu doesn't show a track as active while nothing is displayed.
+		// Guard against a newer selection: only reflect "no captions" if this track is still
+		// the current one, so a rapid switch isn't clobbered.
 		if (captions.currentTrack.value === idx) {
 			captions.currentTrack.value = -1;
 			captions.isCaptionsEnabled.value = false;
