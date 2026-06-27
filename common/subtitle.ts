@@ -4,14 +4,28 @@ export function normalizeSubtitleTrack(value: string | null | undefined): string
 	return value || null;
 }
 
+/** Lower-cased file extension of a subtitle url, ignoring any query string or hash fragment. */
+function subtitleUrlExtension(url: string): string | undefined {
+	const path = url.split("?")[0].split("#")[0];
+	return path.split(".").pop()?.toLowerCase();
+}
+
 /**
- * Guesses the content type from the URL extension, defaulting to `text/vtt`. The default is
- * intentionally permissive: the server does not validate external subtitle URLs, so an
- * unsupported file fails to render in the browser rather than being rejected.
+ * Whether `url` points at a subtitle format we support. The server uses this to reject external
+ * subtitle urls before they reach the player; only these extensions are mapped to a renderable
+ * content type by `inferSubtitleContentType`.
+ */
+export function isSupportedSubtitleUrl(url: string): boolean {
+	const ext = subtitleUrlExtension(url);
+	return ext === "vtt" || ext === "ass" || ext === "ssa";
+}
+
+/**
+ * Guesses the content type from the URL extension, mapping `.ass`/`.ssa` to ASS and everything
+ * else to WebVTT. Only meaningful for urls that passed `isSupportedSubtitleUrl`.
  */
 export function inferSubtitleContentType(url: string): CustomMediaTextTrack["contentType"] {
-	const path = url.split("?")[0].split("#")[0];
-	const ext = path.split(".").pop()?.toLowerCase();
+	const ext = subtitleUrlExtension(url);
 	return ext === "ass" || ext === "ssa" ? "text/x-ass" : "text/vtt";
 }
 
