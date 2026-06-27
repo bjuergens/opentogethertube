@@ -54,11 +54,11 @@ interface Props {
 	 * URL of an external subtitle file. `null`/`undefined` means no subtitles are
 	 * shown by default.
 	 */
-	defaultTrack?: string | null;
+	defaultSubtitleTrack?: string | null;
 }
 
 const props = defineProps<Props>();
-const { videoUrl, videoMime, thumbnail, defaultTrack } = toRefs(props);
+const { videoUrl, videoMime, thumbnail, defaultSubtitleTrack } = toRefs(props);
 const videoElem = ref<HTMLVideoElement | undefined>();
 const captions = useCaptions();
 const audioBoost = useMediaAudioBoost(videoElem);
@@ -68,24 +68,24 @@ const assContainer = ref<HTMLDivElement | undefined>();
 
 /**
  * The available text tracks, unified across source types. Manifest items declare
- * their tracks; for other items the single `defaultTrack` external subtitle (if
- * any) is the only track.
+ * their tracks; for other items the single `defaultSubtitleTrack` external subtitle
+ * (if any) is the only track.
  */
 const textTracks = computed<CustomMediaTextTrack[]>(() => {
 	if (videoMime.value === "application/json") {
 		return manifest.value?.textTracks ?? [];
 	}
-	if (defaultTrack.value) {
+	if (defaultSubtitleTrack.value) {
 		// Infer the subtitle format of the external (non-manifest) track from its
 		// URL so external `.vtt`/`.ass` files go through the same rendering paths as
 		// the tracks declared by a manifest.
-		const path = defaultTrack.value.split("?")[0].split("#")[0];
+		const path = defaultSubtitleTrack.value.split("?")[0].split("#")[0];
 		const ext = path.split(".").pop()?.toLowerCase();
 		const contentType: CustomMediaTextTrack["contentType"] =
 			ext === "ass" || ext === "ssa" ? "text/x-ass" : "text/vtt";
 		return [
 			{
-				url: defaultTrack.value,
+				url: defaultSubtitleTrack.value,
 				contentType,
 				srclang: "und",
 				default: true,
@@ -156,7 +156,7 @@ function isCaptionsSupported(): boolean {
 	return true;
 }
 
-function textTrack(idx: number) {
+function textTrackAt(idx: number) {
 	return textTracks.value[idx];
 }
 
@@ -175,7 +175,7 @@ function nativeTrackFor(url: string): TextTrack | undefined {
  * Activate the ASS overlay for the given text track index, if it exists.
  */
 function activateAssTrack(idx: number): Promise<void> {
-	const track = textTrack(idx);
+	const track = textTrackAt(idx);
 	if (!track) {
 		return Promise.resolve();
 	}
@@ -195,7 +195,7 @@ function setCaptionsEnabled(enabled: boolean): void {
 		}
 		return;
 	}
-	const track = textTrack(captions.currentTrack.value);
+	const track = textTrackAt(captions.currentTrack.value);
 	if (!track) {
 		console.warn("DirectPlayer: invalid captions track index:", captions.currentTrack.value);
 		return;
@@ -242,7 +242,7 @@ function setCaptionsTrack(track: number): void {
 		return;
 	}
 	console.log("DirectPlayer: setCaptionsTrack:", track);
-	const selected = textTrack(track);
+	const selected = textTrackAt(track);
 	if (!selected) {
 		console.warn("DirectPlayer: invalid captions track index:", track);
 		return;
@@ -383,19 +383,19 @@ async function loadVideoSource() {
 	// track's mode to "showing" below.
 	captions.captionsTracks.value = getCaptionsTracks();
 	let defaultTrackIdx = -1;
-	if (defaultTrack.value) {
-		defaultTrackIdx = textTracks.value.findIndex(t => t.url === defaultTrack.value);
+	if (defaultSubtitleTrack.value) {
+		defaultTrackIdx = textTracks.value.findIndex(t => t.url === defaultSubtitleTrack.value);
 	}
 	captions.currentTrack.value = defaultTrackIdx;
 	captions.isCaptionsEnabled.value = defaultTrackIdx !== -1;
 	if (defaultTrackIdx !== -1) {
-		if (textTrack(defaultTrackIdx)?.contentType === "text/x-ass") {
+		if (textTrackAt(defaultTrackIdx)?.contentType === "text/x-ass") {
 			// Fire-and-forget: the overlay builds itself once the video's
 			// dimensions are known, so it must not block load()/play() below.
 			activateAssTrack(defaultTrackIdx);
 		} else {
 			await nextTick();
-			const native = nativeTrackFor(textTrack(defaultTrackIdx).url);
+			const native = nativeTrackFor(textTrackAt(defaultTrackIdx).url);
 			if (native) {
 				native.mode = "showing";
 			}
@@ -460,8 +460,8 @@ onMounted(() => {
 	loadVideoSource();
 });
 
-watch([videoUrl, defaultTrack], () => {
-	console.log("DirectPlayer: videoUrl or defaultTrack changed");
+watch([videoUrl, defaultSubtitleTrack], () => {
+	console.log("DirectPlayer: videoUrl or defaultSubtitleTrack changed");
 	loadVideoSource();
 });
 
