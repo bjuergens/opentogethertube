@@ -326,25 +326,27 @@ const thumbnailHasError = ref(false);
 const hasError = ref(false);
 const voted = ref(false);
 const showEditDialog = ref(false);
-// External subtitle URL input (non-manifest items) and the manifest track selector
-// both feed the same `defaultSubtitleTrack` field; only one is shown at a time.
-const editedSubtitleUrl = props.isPreview ? ref("") : ref(item.value.defaultSubtitleTrack ?? "");
+// The single source of truth for the edited default subtitle track. `null` means
+// "no subtitles". The manifest track selector binds to it directly; the external
+// subtitle URL input binds via `editedSubtitleUrl`, which maps the input's empty
+// string to/from `null`. Only one of those widgets is shown at a time.
+const editedDefaultTrack = ref<string | null>(
+	props.isPreview ? null : item.value.defaultSubtitleTrack ?? null,
+);
+const editedSubtitleUrl = computed<string>({
+	get: () => editedDefaultTrack.value ?? "",
+	set: value => {
+		editedDefaultTrack.value = value || null;
+	},
+});
 
 const isManifestItem = computed(() => item.value.mime === "application/json");
-const editedDefaultTrack = ref<string | null>(null);
 const manifestTracks = computed<CustomMediaTextTrack[]>(() => item.value.textTracks ?? []);
 
 function formatTrackLabel(track: CustomMediaTextTrack): string {
 	const name = track.name ?? track.srclang;
 	const format = track.contentType === "text/x-ass" ? "ASS" : "VTT";
 	return `${name} [${track.srclang}] (${format})`;
-}
-
-// Resolve the edited `defaultSubtitleTrack` from whichever widget applies to this
-// item: the manifest track selector, or the external subtitle URL input (where an
-// empty string means "no subtitles").
-function getEditedDefaultSubtitleTrack(): string | null {
-	return isManifestItem.value ? editedDefaultTrack.value : editedSubtitleUrl.value || null;
 }
 
 const videoLength = computed(() => secondsToTimestamp(item.value?.length ?? 0));
@@ -379,29 +381,25 @@ function getPostData(): VideoAdd {
 	const data: VideoAdd = {
 		service: item.value.service,
 		id: item.value.id,
-		// Use `item.value.*` for preview since the edited refs might not be saved yet
+		// Use `item.value.*` for preview since the edited ref might not be saved yet
 		defaultSubtitleTrack: props.isPreview
 			? item.value.defaultSubtitleTrack
-			: getEditedDefaultSubtitleTrack(),
+			: editedDefaultTrack.value,
 	};
 	return data;
 }
 
-// Ensure that the edited values reflect the current item state when the dialog opens
+// Ensure that the edited value reflects the current item state when the dialog opens
 watch(showEditDialog, open => {
-	if (!open) {
-		return;
+	if (open && !props.isPreview) {
+		editedDefaultTrack.value = item.value.defaultSubtitleTrack ?? null;
 	}
-	if (!props.isPreview) {
-		editedSubtitleUrl.value = item.value.defaultSubtitleTrack ?? "";
-	}
-	editedDefaultTrack.value = item.value.defaultSubtitleTrack ?? null;
 });
 
 async function saveEdit() {
 	if (props.isPreview) {
 		// Update the subtitle settings for playNow().
-		item.value.defaultSubtitleTrack = getEditedDefaultSubtitleTrack();
+		item.value.defaultSubtitleTrack = editedDefaultTrack.value;
 		showEditDialog.value = false;
 	} else {
 		isLoadingEdit.value = true;
