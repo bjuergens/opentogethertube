@@ -146,20 +146,18 @@ function nativeTrackFor(url: string): TextTrack | undefined {
 	return el?.track ?? undefined;
 }
 
-function activateAssTrack(idx: number): Promise<void> {
+async function activateAssTrack(idx: number): Promise<void> {
 	const track = textTrackAt(idx);
 	if (!track) {
-		return Promise.resolve();
+		return;
 	}
-	return assOverlay.load(track.url).catch(e => {
-		console.error("DirectPlayer: failed to activate ASS subtitles:", e);
-		// Guard against a newer selection: only reflect "no captions" if this track is still
-		// the current one, so a rapid switch isn't clobbered.
-		if (captions.currentTrack.value === idx) {
-			captions.currentTrack.value = -1;
-			captions.isCaptionsEnabled.value = false;
-		}
-	});
+	const shown = await assOverlay.load(track.url);
+	// Guard against a newer selection: only reflect "no captions" if this track is still
+	// the current one, so a rapid switch isn't clobbered.
+	if (!shown && captions.currentTrack.value === idx) {
+		captions.currentTrack.value = -1;
+		captions.isCaptionsEnabled.value = false;
+	}
 }
 
 function setCaptionsEnabled(enabled: boolean): void {

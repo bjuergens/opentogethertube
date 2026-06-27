@@ -45,11 +45,13 @@ export function useAssOverlay(
 		visible.value = false;
 	}
 
+	// Resolves to whether the overlay ended up active for this url. Failures are logged here
+	// and reported as `false` rather than thrown, matching the rest of the player code.
 	async function fetchAndCreate(
 		url: string,
 		video: HTMLVideoElement,
 		box: HTMLElement,
-	): Promise<void> {
+	): Promise<boolean> {
 		const seq = ++loadSeq;
 		currentUrl = url;
 		try {
@@ -60,39 +62,38 @@ export function useAssOverlay(
 			const content = await response.text();
 			// Superseded by a newer load()/destroy() while fetching; dropping it is normal.
 			if (seq !== loadSeq) {
-				return;
+				return false;
 			}
 			await waitForDimensions(video);
 			if (seq !== loadSeq) {
-				return;
+				return false;
 			}
 			instance = new ASS(content, video, { container: box });
 			visible.value = true;
+			return true;
 		} catch (e) {
-			// Only surface the failure if this load is still the current one.
+			// Only report the failure if this load is still the current one.
 			if (seq !== loadSeq) {
-				return;
+				return false;
 			}
+			console.error("useAssOverlay: failed to load ASS subtitles:", e);
 			currentUrl = null;
-			throw e;
+			return false;
 		}
 	}
 
-	function load(url: string): Promise<void> {
+	function load(url: string): Promise<boolean> {
 		const video = videoElement.value;
 		const box = container.value;
-		// Reject rather than throw synchronously so every failure mode reaches the caller's
-		// async error handling uniformly (callers invoke load() fire-and-forget).
 		if (!video || !box) {
-			return Promise.reject(
-				new Error("useAssOverlay.load() called before the video element was mounted"),
-			);
+			console.error("useAssOverlay: load() called before the video element was mounted");
+			return Promise.resolve(false);
 		}
 		if (currentUrl === url) {
 			if (instance) {
 				show();
 			}
-			return Promise.resolve();
+			return Promise.resolve(true);
 		}
 		destroy();
 		return fetchAndCreate(url, video, box);
