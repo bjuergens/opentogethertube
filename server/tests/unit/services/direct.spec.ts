@@ -198,7 +198,7 @@ describe("Direct", () => {
 			expect(video.defaultSubtitleTrack).toEqual("https://example.com/de.vtt");
 		});
 
-		it("resolves defaultSubtitleTrack to null when no track is marked default", async () => {
+		it("resolves defaultSubtitleTrack to \"\" when no track is marked default", async () => {
 			mockManifest({
 				...baseManifest,
 				textTracks: [
@@ -211,14 +211,14 @@ describe("Direct", () => {
 				],
 			});
 			const video = await adapter.fetchVideoInfo("https://example.com/media.json");
-			expect(video.defaultSubtitleTrack).toBeNull();
+			expect(video.defaultSubtitleTrack).toEqual("");
 		});
 
-		it("resolves defaultSubtitleTrack to null when there are no text tracks", async () => {
+		it("resolves defaultSubtitleTrack to \"\" when there are no text tracks", async () => {
 			mockManifest({ ...baseManifest });
 			const video = await adapter.fetchVideoInfo("https://example.com/media.json");
 			expect(video.textTracks).toBeUndefined();
-			expect(video.defaultSubtitleTrack).toBeNull();
+			expect(video.defaultSubtitleTrack).toEqual("");
 		});
 	});
 });

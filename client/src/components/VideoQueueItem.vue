@@ -326,12 +326,13 @@ const thumbnailHasError = ref(false);
 const hasError = ref(false);
 const voted = ref(false);
 const showEditDialog = ref(false);
-// The single source of truth for the edited default subtitle track. `null` means
-// "no subtitles". The manifest track selector binds to it directly; the external
-// subtitle URL input binds via `externalSubtitleUrl`, a string view that maps the
-// input's empty string to/from `null`. Only one of those widgets is shown at a time.
+// The single source of truth for the edited default subtitle track. Within the
+// dialog `null` means "no subtitles" (the manifest <Select>'s None item can't use
+// an empty string); it is converted to/from the wire's canonical "" at the edges.
+// The manifest selector binds to it directly; the external subtitle URL input binds
+// via `externalSubtitleUrl`. Only one of those widgets is shown at a time.
 const editedDefaultTrack = ref<string | null>(
-	props.isPreview ? null : item.value.defaultSubtitleTrack ?? null,
+	props.isPreview ? null : item.value.defaultSubtitleTrack || null,
 );
 const externalSubtitleUrl = computed<string>({
 	get: () => editedDefaultTrack.value ?? "",
@@ -381,10 +382,10 @@ function getPostData(): VideoAdd {
 	const data: VideoAdd = {
 		service: item.value.service,
 		id: item.value.id,
-		// Use `item.value.*` for preview since the edited fields might not be saved yet
-		defaultSubtitleTrack: props.isPreview
-			? item.value.defaultSubtitleTrack
-			: editedDefaultTrack.value,
+		// "" is the canonical "no subtitles". Use `item.value.*` for preview since the
+		// edited fields might not be saved yet; `?? ""` also maps the dialog's null.
+		defaultSubtitleTrack:
+			(props.isPreview ? item.value.defaultSubtitleTrack : editedDefaultTrack.value) ?? "",
 	};
 	return data;
 }
@@ -392,14 +393,14 @@ function getPostData(): VideoAdd {
 // Ensure that the edited values reflect the current item state when the dialog opens
 watch(showEditDialog, open => {
 	if (open && !props.isPreview) {
-		editedDefaultTrack.value = item.value.defaultSubtitleTrack ?? null;
+		editedDefaultTrack.value = item.value.defaultSubtitleTrack || null;
 	}
 });
 
 async function saveEdit() {
 	if (props.isPreview) {
-		// Update the subtitle settings for playNow().
-		item.value.defaultSubtitleTrack = editedDefaultTrack.value;
+		// Update the subtitle settings for playNow(); "" is the canonical "no subtitles".
+		item.value.defaultSubtitleTrack = editedDefaultTrack.value ?? "";
 		showEditDialog.value = false;
 	} else {
 		isLoadingEdit.value = true;

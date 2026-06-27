@@ -316,6 +316,24 @@ describe("Room", () => {
 				});
 			});
 
+			it("should default defaultSubtitleTrack to \"\" when omitted", async () => {
+				vi.spyOn(infoextractor, "getVideoInfo").mockResolvedValue(videoToAdd);
+
+				await room.processUnauthorizedRequest(
+					{
+						type: RoomRequestType.AddRequest,
+						video: { ...videoToAdd },
+					},
+					{ token: user.token },
+				);
+
+				expect(room.queue).toHaveLength(1);
+				expect(room.queue.items[0]).toEqual({
+					...videoToAdd,
+					defaultSubtitleTrack: "",
+				});
+			});
+
 		});
 
 		describe("VoteRequest", () => {
