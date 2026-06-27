@@ -45,8 +45,7 @@ export function useAssOverlay(
 		visible.value = false;
 	}
 
-	// Resolves to whether the overlay ended up active for this url. Failures are logged here
-	// and reported as `false` rather than thrown, matching the rest of the player code.
+	// Returns whether the overlay is now active; failures are logged and reported as false, not thrown.
 	async function fetchAndCreate(
 		url: string,
 		video: HTMLVideoElement,
@@ -60,7 +59,6 @@ export function useAssOverlay(
 				throw new Error(`HTTP ${response.status}`);
 			}
 			const content = await response.text();
-			// Superseded by a newer load()/destroy() while fetching; dropping it is normal.
 			if (seq !== loadSeq) {
 				console.debug("useAssOverlay: ASS load superseded after fetch, ignoring:", url);
 				return false;
@@ -77,7 +75,6 @@ export function useAssOverlay(
 			visible.value = true;
 			return true;
 		} catch (e) {
-			// A superseded load that also failed is no longer current; note it at debug level.
 			if (seq !== loadSeq) {
 				console.debug("useAssOverlay: superseded ASS load failed, ignoring:", url, e);
 				return false;
