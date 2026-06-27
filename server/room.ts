@@ -59,7 +59,7 @@ import {
 	VideoAlreadyQueuedException,
 	VideoNotFoundException,
 } from "./exceptions.js";
-import { isSupportedSubtitleUrl } from "ott-common/subtitle.js";
+import { inferSubtitleContentTypeOrNull } from "ott-common/subtitle.js";
 import storage from "./storage.js";
 import tokens, { type SessionInfo } from "./auth/tokens.js";
 import { OttException } from "ott-common/exceptions.js";
@@ -227,7 +227,7 @@ export type RoomStatePersistable = Omit<
  * "no subtitles") is always allowed; this only guards non-empty urls.
  */
 function assertSupportedSubtitleTrack(url: string | null | undefined): void {
-	if (url && !isSupportedSubtitleUrl(url)) {
+	if (url && inferSubtitleContentTypeOrNull(url) === null) {
 		throw new UnsupportedSubtitleType();
 	}
 }

@@ -11,28 +11,28 @@ function subtitleUrlExtension(url: string): string | undefined {
 }
 
 /**
- * Whether `url` points at a subtitle format we support. The server uses this to reject external
- * subtitle urls before they reach the player; only these extensions are mapped to a renderable
- * content type by `inferSubtitleContentType`.
+ * Maps a subtitle url to its renderable content type by extension (`.ass`/`.ssa` -> ASS, `.vtt` ->
+ * WebVTT), or `null` if the format is unsupported. The server treats a `null` result as "reject
+ * this external subtitle url before it reaches the player".
  */
-export function isSupportedSubtitleUrl(url: string): boolean {
+export function inferSubtitleContentTypeOrNull(
+	url: string,
+): CustomMediaTextTrack["contentType"] | null {
 	const ext = subtitleUrlExtension(url);
-	return ext === "vtt" || ext === "ass" || ext === "ssa";
-}
-
-/**
- * Guesses the content type from the URL extension, mapping `.ass`/`.ssa` to ASS and everything
- * else to WebVTT. Only meaningful for urls that passed `isSupportedSubtitleUrl`.
- */
-export function inferSubtitleContentType(url: string): CustomMediaTextTrack["contentType"] {
-	const ext = subtitleUrlExtension(url);
-	return ext === "ass" || ext === "ssa" ? "text/x-ass" : "text/vtt";
+	if (ext === "ass" || ext === "ssa") {
+		return "text/x-ass";
+	}
+	if (ext === "vtt") {
+		return "text/vtt";
+	}
+	return null;
 }
 
 export function externalSubtitleAsTextTrack(url: string): CustomMediaTextTrack {
 	return {
 		url,
-		contentType: inferSubtitleContentType(url),
+		// Callers only reach here with a server-validated url; fall back to WebVTT defensively.
+		contentType: inferSubtitleContentTypeOrNull(url) ?? "text/vtt",
 		srclang: "und",
 		default: true,
 	};
