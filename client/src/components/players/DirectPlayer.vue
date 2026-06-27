@@ -48,12 +48,6 @@ interface Props {
 	videoUrl: string;
 	videoMime: string;
 	thumbnail?: string;
-	/**
-	 * URL of the subtitle track to select by default for all viewers. For manifest
-	 * items it must be one of the manifest's text tracks; for other items it is the
-	 * URL of an external subtitle file. `null`/`undefined` means no subtitles are
-	 * shown by default.
-	 */
 	defaultSubtitleTrack?: string | null;
 }
 
@@ -66,19 +60,11 @@ const qualities = useQualities();
 const manifest = ref<CustomMediaManifest | null>(null);
 const assContainer = ref<HTMLDivElement | undefined>();
 
-/**
- * The available text tracks, unified across source types. Manifest items declare
- * their tracks; for other items the single `defaultSubtitleTrack` external subtitle
- * (if any) is the only track.
- */
 const textTracks = computed<CustomMediaTextTrack[]>(() => {
 	if (videoMime.value === "application/json") {
 		return manifest.value?.textTracks ?? [];
 	}
 	if (defaultSubtitleTrack.value) {
-		// Infer the subtitle format of the external (non-manifest) track from its
-		// URL so external `.vtt`/`.ass` files go through the same rendering paths as
-		// the tracks declared by a manifest.
 		const path = defaultSubtitleTrack.value.split("?")[0].split("#")[0];
 		const ext = path.split(".").pop()?.toLowerCase();
 		const contentType: CustomMediaTextTrack["contentType"] =
@@ -160,20 +146,11 @@ function textTrackAt(idx: number) {
 	return textTracks.value[idx];
 }
 
-/**
- * Resolves the native TextTrack backing a VTT track url. Only VTT tracks are
- * rendered as <track> elements, so ASS (and unknown) urls return undefined.
- * Keying off the <track src> avoids mapping unified indices onto the VTT-only
- * native list.
- */
 function nativeTrackFor(url: string): TextTrack | undefined {
 	const el = videoElem.value?.querySelector<HTMLTrackElement>(`track[src="${CSS.escape(url)}"]`);
 	return el?.track ?? undefined;
 }
 
-/**
- * Activate the ASS overlay for the given text track index, if it exists.
- */
 function activateAssTrack(idx: number): Promise<void> {
 	const track = textTrackAt(idx);
 	if (!track) {
@@ -376,11 +353,6 @@ async function loadVideoSource() {
 		qualities.currentVideoTrack.value = -1;
 	}
 
-	// The default subtitle track (set via the Edit Video dialog) selects which track
-	// to show by default, the same way for manifest tracks and external subtitle
-	// files. A URL selects that track; `null`/`undefined` means no subtitles. Newly
-	// inserted <track> elements start "disabled", so we explicitly set the chosen
-	// track's mode to "showing" below.
 	captions.captionsTracks.value = getCaptionsTracks();
 	let defaultTrackIdx = -1;
 	if (defaultSubtitleTrack.value) {
@@ -390,8 +362,6 @@ async function loadVideoSource() {
 	captions.isCaptionsEnabled.value = defaultTrackIdx !== -1;
 	if (defaultTrackIdx !== -1) {
 		if (textTrackAt(defaultTrackIdx)?.contentType === "text/x-ass") {
-			// Fire-and-forget: the overlay builds itself once the video's
-			// dimensions are known, so it must not block load()/play() below.
 			activateAssTrack(defaultTrackIdx);
 		} else {
 			await nextTick();
