@@ -64,7 +64,7 @@ yarn test:e2e:ui       # Open Playwright UI (interactive)
 yarn test:component    # Run component tests
 
 # Rust tests
-cargo test                # requires ipv6 (harness integration tests bind/connect over ::1)
+cargo test                # requires ipv6
 cargo test -p ott-balancer
 ```
 
