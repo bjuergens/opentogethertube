@@ -10,7 +10,7 @@ use hyper_util::rt::TokioExecutor;
 use hyper_util::server::conn::auto;
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, Layer};
@@ -165,11 +165,25 @@ pub async fn run() -> anyhow::Result<()> {
     };
 
     // on linux, binding ipv6 will also bind ipv4
-    let listener6 = TcpListener::bind(bind_addr6)
-        .await
-        .context("binding primary inbound socket")?;
+    let listener6 = match TcpListener::bind(bind_addr6).await {
+        Ok(listener) => {
+            info!("Serving on {}", bind_addr6);
+            listener
+        }
+        Err(err) => {
+            // Some environments (e.g. sandboxed CI containers) don't have IPv6
+            // support, so fall back to binding IPv4 instead of failing outright.
+            warn!("Failed to bind IPv6 socket ({}), falling back to IPv4", err);
+            let bind_addr4: SocketAddr =
+                SocketAddr::new(std::net::Ipv4Addr::UNSPECIFIED.into(), config.port);
+            let listener = TcpListener::bind(bind_addr4)
+                .await
+                .context("binding primary inbound socket")?;
+            info!("Serving on {}", bind_addr4);
+            listener
+        }
+    };
 
-    info!("Serving on {}", bind_addr6);
     let mut tasks = FuturesUnordered::new();
     loop {
         let accept_fut = Box::pin(listener6.accept());

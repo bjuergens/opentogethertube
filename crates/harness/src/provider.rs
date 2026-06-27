@@ -44,7 +44,7 @@ impl DiscoveryProvider {
         loop {
             println!("Provider: Connecting to balancer");
             let Ok((mut ws, _)) =
-                tokio_tungstenite::connect_async(format!("ws://[::]:{}", self.port)).await
+                tokio_tungstenite::connect_async(format!("ws://127.0.0.1:{}", self.port)).await
             else {
                 println!("Provider: Failed to connect to balancer, retrying in 1s");
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;

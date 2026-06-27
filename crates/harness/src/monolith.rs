@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    net::{IpAddr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     pin::Pin,
     sync::{
         atomic::{AtomicU32, Ordering},
@@ -73,9 +73,9 @@ impl Monolith {
     ) -> anyhow::Result<Self> {
         // Binding to port 0 will let the OS allocate a random port for us.
         let listener =
-            Arc::new(TcpListener::bind(SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 0)).await?);
+            Arc::new(TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0)).await?);
         let http_listener =
-            Arc::new(TcpListener::bind(SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), 0)).await?);
+            Arc::new(TcpListener::bind(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0)).await?);
         let notif_connect = Arc::new(Notify::new());
         let notif_disconnect = Arc::new(Notify::new());
         let notif_recv = Arc::new(Notify::new());
