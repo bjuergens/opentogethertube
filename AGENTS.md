@@ -16,6 +16,8 @@ OpenTogetherTube is a real-time video synchronization web application. It uses a
 
 ## Build & Development Commands
 
+> **Note:** Yarn is the canonical package manager. If `yarn install` is unavailable or failing (e.g. in some sandboxed/CI containers), `bun install` is a working drop-in for installing dependencies so tests and linters can run.
+
 **Build:**
 
 ```bash
