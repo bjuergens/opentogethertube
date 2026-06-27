@@ -177,7 +177,7 @@ impl TestRunner {
     pub fn url(&self, scheme: impl AsRef<str>, path: impl AsRef<str>) -> reqwest::Url {
         let path = path.as_ref();
         assert!(path.starts_with('/'), "path must start with '/'");
-        let built = format!("{}://127.0.0.1:{}{}", scheme.as_ref(), self.port(), path);
+        let built = format!("{}://[::1]:{}{}", scheme.as_ref(), self.port(), path);
         reqwest::Url::parse(&built).expect("failed to parse URL")
     }
 
