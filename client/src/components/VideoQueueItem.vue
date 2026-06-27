@@ -190,7 +190,7 @@
 					<FieldLabel for="edit-default-subtitle-track">
 						{{ $t("video-queue-item.edit.default-subtitle-track") }}
 					</FieldLabel>
-					<Select v-model="manifestDefaultTrack">
+					<Select v-model="editedDefaultTrack">
 						<SelectTrigger
 							id="edit-default-subtitle-track"
 							data-cy="edit-default-subtitle-track"
@@ -326,13 +326,19 @@ const thumbnailHasError = ref(false);
 const hasError = ref(false);
 const voted = ref(false);
 const showEditDialog = ref(false);
-// Two independent edit widgets, one per item type; only one is shown at a time.
-// Manifest items pick from their declared tracks (`manifestDefaultTrack` holds the
-// chosen track URL, or `null` for "no subtitles"); other items take a free-text
-// external subtitle URL (`externalSubtitleUrl`, where empty means "no subtitles").
-// Both resolve to the item's single `defaultSubtitleTrack` field on save.
-const manifestDefaultTrack = ref<string | null>(null);
-const externalSubtitleUrl = ref<string>("");
+// The single source of truth for the edited default subtitle track. `null` means
+// "no subtitles". The manifest track selector binds to it directly; the external
+// subtitle URL input binds via `externalSubtitleUrl`, a string view that maps the
+// input's empty string to/from `null`. Only one of those widgets is shown at a time.
+const editedDefaultTrack = ref<string | null>(
+	props.isPreview ? null : item.value.defaultSubtitleTrack ?? null,
+);
+const externalSubtitleUrl = computed<string>({
+	get: () => editedDefaultTrack.value ?? "",
+	set: value => {
+		editedDefaultTrack.value = value || null;
+	},
+});
 
 const isManifestItem = computed(() => item.value.mime === "application/json");
 const manifestTracks = computed<CustomMediaTextTrack[]>(() => item.value.textTracks ?? []);
@@ -341,25 +347,6 @@ function formatTrackLabel(track: CustomMediaTextTrack): string {
 	const name = track.name ?? track.srclang;
 	const format = track.contentType === "text/x-ass" ? "ASS" : "VTT";
 	return `${name} [${track.srclang}] (${format})`;
-}
-
-// The edited `defaultSubtitleTrack`, read from whichever widget applies to this
-// item. An empty external URL means "no subtitles".
-function resolveEditedDefaultTrack(): string | null {
-	return isManifestItem.value ? manifestDefaultTrack.value : externalSubtitleUrl.value || null;
-}
-
-// Load both widgets from the item's current default. Only the applicable widget is
-// read on save, so seeding both with the same value is harmless and keeps a re-open
-// (e.g. after a failed save) showing the persisted value.
-function seedEditFields(): void {
-	const current = item.value.defaultSubtitleTrack ?? null;
-	manifestDefaultTrack.value = current;
-	externalSubtitleUrl.value = current ?? "";
-}
-
-if (!props.isPreview) {
-	seedEditFields();
 }
 
 const videoLength = computed(() => secondsToTimestamp(item.value?.length ?? 0));
@@ -397,7 +384,7 @@ function getPostData(): VideoAdd {
 		// Use `item.value.*` for preview since the edited fields might not be saved yet
 		defaultSubtitleTrack: props.isPreview
 			? item.value.defaultSubtitleTrack
-			: resolveEditedDefaultTrack(),
+			: editedDefaultTrack.value,
 	};
 	return data;
 }
@@ -405,14 +392,14 @@ function getPostData(): VideoAdd {
 // Ensure that the edited values reflect the current item state when the dialog opens
 watch(showEditDialog, open => {
 	if (open && !props.isPreview) {
-		seedEditFields();
+		editedDefaultTrack.value = item.value.defaultSubtitleTrack ?? null;
 	}
 });
 
 async function saveEdit() {
 	if (props.isPreview) {
 		// Update the subtitle settings for playNow().
-		item.value.defaultSubtitleTrack = resolveEditedDefaultTrack();
+		item.value.defaultSubtitleTrack = editedDefaultTrack.value;
 		showEditDialog.value = false;
 	} else {
 		isLoadingEdit.value = true;
