@@ -72,8 +72,7 @@ export function useAssOverlay(
 				return false;
 			}
 			// assjs attaches a ResizeObserver to the video element, so subtitles keep rendering
-			// at the correct position when the video's dimensions change — no manual resize
-			// handling is needed here.
+			// at the correct position when the video's dimensions change.
 			instance = new ASS(content, video, { container: box });
 			visible.value = true;
 			return true;
