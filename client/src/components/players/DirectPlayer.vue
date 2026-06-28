@@ -152,32 +152,30 @@ function applyCaptions(): void {
 	if (!track) {
 		return;
 	}
-	if (track.contentType === "text/x-ass") {
-		assOverlay.load(track.url);
-	} else {
-		// Native <track> DOM elements only exist for VTT tracks, so their index space diverges
-		// from `textTracks` (which includes ASS). Resolve the native TextTrack by src URL.
-		const el = videoElem.value?.querySelector<HTMLTrackElement>(
-			`track[src="${CSS.escape(track.url)}"]`
-		);
-		if (el?.track) {
-			el.track.mode = "showing";
-		} else {
-			console.warn("DirectPlayer: subtitle track element not found:", track.url);
+	switch (track.contentType) {
+		case "text/x-ass":
+			assOverlay.load(track.url);
+			break;
+		case "text/vtt": {
+			// Native <track> DOM elements only exist for VTT tracks, so their index space diverges
+			// from `textTracks` (which includes ASS). Resolve the native TextTrack by src URL.
+			const el = videoElem.value?.querySelector<HTMLTrackElement>(
+				`track[src="${CSS.escape(track.url)}"]`
+			);
+			if (el?.track) {
+				el.track.mode = "showing";
+			} else {
+				console.warn("DirectPlayer: subtitle track element not found:", track.url);
+			}
+			break;
 		}
+		default:
+			console.warn("DirectPlayer: unsupported subtitle content type:", track.contentType);
 	}
 }
 
 // flush: "post" ensures the <track> DOM elements are present before we look them up by URL.
 watch([selectedTrack, captions.isCaptionsEnabled], applyCaptions, { flush: "post" });
-
-function setCaptionsEnabled(enabled: boolean): void {
-	captions.isCaptionsEnabled.value = enabled;
-}
-
-function isCaptionsEnabled(): boolean {
-	return captions.isCaptionsEnabled.value;
-}
 
 function getCaptionsTracks(): CaptionTrack[] {
 	return textTracks.value.map(track => ({
@@ -316,7 +314,7 @@ async function loadVideoSource() {
 		: -1;
 	const hasDefault = defaultTrackIdx >= 0;
 	setCaptionsTrack(hasDefault ? defaultTrackIdx : 0);
-	setCaptionsEnabled(hasDefault);
+	captions.isCaptionsEnabled.value = hasDefault;
 
 	videoElem.value.poster = thumbnail.value ?? "";
 	videoElem.value.load();
@@ -387,8 +385,10 @@ defineExpose({
 	getPosition,
 	setPosition,
 	isCaptionsSupported,
-	setCaptionsEnabled,
-	isCaptionsEnabled,
+	setCaptionsEnabled: (enabled: boolean) => {
+		captions.isCaptionsEnabled.value = enabled;
+	},
+	isCaptionsEnabled: () => captions.isCaptionsEnabled.value,
 	getCaptionsTracks,
 	setCaptionsTrack,
 	isQualitySupported,
