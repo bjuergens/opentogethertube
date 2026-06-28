@@ -134,13 +134,6 @@ function isCaptionsSupported(): boolean {
 	return true;
 }
 
-// Native <track> DOM elements only exist for VTT tracks, so their index space diverges from
-// `textTracks` (which includes ASS). Resolve the native TextTrack by URL instead of by index.
-function nativeTrackFor(url: string): TextTrack | undefined {
-	const el = videoElem.value?.querySelector<HTMLTrackElement>(`track[src="${CSS.escape(url)}"]`);
-	return el?.track ?? undefined;
-}
-
 function clearRendering(): void {
 	if (videoElem.value) {
 		for (const native of Array.from(videoElem.value.textTracks)) {
@@ -159,9 +152,13 @@ function applySelection(idx: number): void {
 	if (track.contentType === "text/x-ass") {
 		assOverlay.load(track.url);
 	} else {
-		const native = nativeTrackFor(track.url);
-		if (native) {
-			native.mode = "showing";
+		// Native <track> DOM elements only exist for VTT tracks, so their index space diverges
+		// from `textTracks` (which includes ASS). Resolve the native TextTrack by src URL.
+		const el = videoElem.value?.querySelector<HTMLTrackElement>(
+			`track[src="${CSS.escape(track.url)}"]`
+		);
+		if (el?.track) {
+			el.track.mode = "showing";
 		} else {
 			console.warn("DirectPlayer: subtitle track element not found:", track.url);
 		}
