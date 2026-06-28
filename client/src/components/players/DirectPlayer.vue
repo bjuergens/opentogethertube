@@ -74,7 +74,8 @@ const vttTracks = computed(() =>
 	textTracks.value.filter(track => track.contentType === "text/vtt")
 );
 const assOverlay = useAssOverlay(videoElem, assContainer);
-// Index into `textTracks` (which includes ASS tracks), or -1 for none.
+// Which track is selected: index into `textTracks` (which includes ASS tracks), or -1 for none.
+// Whether it is actually shown is gated separately by `captions.isCaptionsEnabled`.
 const selectedTrack = ref(-1);
 
 const emit = defineEmits<{
@@ -143,9 +144,12 @@ function clearRendering(): void {
 	assOverlay.destroy();
 }
 
-function applySelection(idx: number): void {
+function applyCaptions(): void {
 	clearRendering();
-	const track = textTracks.value[idx];
+	if (!captions.isCaptionsEnabled.value) {
+		return;
+	}
+	const track = textTracks.value[selectedTrack.value];
 	if (!track) {
 		return;
 	}
@@ -166,22 +170,14 @@ function applySelection(idx: number): void {
 }
 
 // flush: "post" ensures the <track> DOM elements are present before we look them up by URL.
-watch(selectedTrack, applySelection, { flush: "post" });
+watch([selectedTrack, captions.isCaptionsEnabled], applyCaptions, { flush: "post" });
 
 function setCaptionsEnabled(enabled: boolean): void {
-	if (enabled) {
-		if (selectedTrack.value < 0 && textTracks.value.length > 0) {
-			setCaptionsTrack(0);
-		}
-	} else {
-		selectedTrack.value = -1;
-		captions.currentTrack.value = -1;
-		captions.isCaptionsEnabled.value = false;
-	}
+	captions.isCaptionsEnabled.value = enabled;
 }
 
 function isCaptionsEnabled(): boolean {
-	return selectedTrack.value >= 0;
+	return captions.isCaptionsEnabled.value;
 }
 
 function getCaptionsTracks(): CaptionTrack[] {
@@ -196,7 +192,6 @@ function getCaptionsTracks(): CaptionTrack[] {
 function setCaptionsTrack(track: number): void {
 	selectedTrack.value = track;
 	captions.currentTrack.value = track;
-	captions.isCaptionsEnabled.value = track >= 0;
 }
 
 function isQualitySupported(): boolean {
@@ -315,12 +310,13 @@ async function loadVideoSource() {
 	}
 
 	captions.captionsTracks.value = getCaptionsTracks();
-	// Seed the selection from the default track once. The watcher on `selectedTrack` then renders it;
-	// after this, the original default no longer matters.
+	// Seed the selection and enabled state from the default track once; after this the original
+	// default no longer matters. The watcher then renders it.
 	const defaultTrackIdx = defaultSubtitleTrack.value
 		? textTracks.value.findIndex(t => t.url === defaultSubtitleTrack.value)
 		: -1;
 	setCaptionsTrack(defaultTrackIdx);
+	setCaptionsEnabled(defaultTrackIdx !== -1);
 
 	videoElem.value.poster = thumbnail.value ?? "";
 	videoElem.value.load();
