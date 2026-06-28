@@ -61,8 +61,6 @@ const qualities = useQualities();
 const manifest = ref<CustomMediaManifest | null>(null);
 const assContainer = ref<HTMLDivElement | undefined>();
 
-// The combined list of subtitle tracks. ASS tracks have no <track> DOM element; they are rendered
-// by the overlay instead. `selectedTrack` indexes into this list, with -1 meaning "none".
 const textTracks = computed<CustomMediaTextTrack[]>(() => {
 	if (videoMime.value === "application/json") {
 		return manifest.value?.textTracks ?? [];
@@ -76,8 +74,7 @@ const vttTracks = computed(() =>
 	textTracks.value.filter(track => track.contentType === "text/vtt")
 );
 const assOverlay = useAssOverlay(videoElem, assContainer);
-// The single source of truth for which subtitle track is shown. Index into `textTracks`, or -1 for
-// none. Changing it clears the previous rendering (native + ASS) and creates the new one.
+// Index into `textTracks` (which includes ASS tracks), or -1 for none.
 const selectedTrack = ref(-1);
 
 const emit = defineEmits<{
@@ -144,7 +141,6 @@ function nativeTrackFor(url: string): TextTrack | undefined {
 	return el?.track ?? undefined;
 }
 
-// Undo all subtitle rendering: hide every native track and tear down the ASS overlay.
 function clearRendering(): void {
 	if (videoElem.value) {
 		for (const native of Array.from(videoElem.value.textTracks)) {
@@ -154,8 +150,6 @@ function clearRendering(): void {
 	assOverlay.destroy();
 }
 
-// Render the track at `idx`, or nothing if idx is out of range. Always clears the previous
-// rendering first.
 function applySelection(idx: number): void {
 	clearRendering();
 	const track = textTracks.value[idx];
