@@ -74,8 +74,7 @@ const vttTracks = computed(() =>
 	textTracks.value.filter(track => track.contentType === "text/vtt")
 );
 const assOverlay = useAssOverlay(videoElem, assContainer);
-// Which track is selected: index into `textTracks` (which includes ASS tracks), or -1 for none.
-// Whether it is actually shown is gated separately by `captions.isCaptionsEnabled`.
+// -1 = none. Whether the selected track is shown is gated separately by captions.isCaptionsEnabled.
 const selectedTrack = ref(-1);
 
 const emit = defineEmits<{
@@ -310,9 +309,8 @@ async function loadVideoSource() {
 	}
 
 	captions.captionsTracks.value = getCaptionsTracks();
-	// Seed the selection and enabled state once; after this the original default no longer matters.
-	// If there's a default subtitle track, select and show it. Otherwise default to the first track
-	// (so enabling captions shows something) but leave captions off.
+	// With a default subtitle track, select and show it; otherwise select the first track but leave
+	// captions off (so enabling them later shows something).
 	const defaultTrackIdx = defaultSubtitleTrack.value
 		? textTracks.value.findIndex(t => t.url === defaultSubtitleTrack.value)
 		: -1;
