@@ -29,10 +29,14 @@ export function inferSubtitleContentTypeOrNull(
 }
 
 export function externalSubtitleAsTextTrack(url: string): CustomMediaTextTrack {
+	const contentType = inferSubtitleContentTypeOrNull(url);
+	if (!contentType) {
+		// Callers only reach here with a server-validated url, so this is a programming error.
+		throw new Error(`Cannot build a text track for unsupported subtitle url: ${url}`);
+	}
 	return {
 		url,
-		// Callers only reach here with a server-validated url; fall back to WebVTT defensively.
-		contentType: inferSubtitleContentTypeOrNull(url) ?? "text/vtt",
+		contentType,
 		srclang: "und",
 		default: true,
 	};
