@@ -157,8 +157,6 @@ function applyCaptions(): void {
 			assOverlay.load(track.url);
 			break;
 		case "text/vtt": {
-			// Native <track> DOM elements only exist for VTT tracks, so their index space diverges
-			// from `textTracks` (which includes ASS). Resolve the native TextTrack by src URL.
 			const el = videoElem.value?.querySelector<HTMLTrackElement>(
 				`track[src="${CSS.escape(track.url)}"]`
 			);
@@ -307,8 +305,6 @@ async function loadVideoSource() {
 	}
 
 	captions.captionsTracks.value = getCaptionsTracks();
-	// With a default subtitle track, select and show it; otherwise select the first track but leave
-	// captions off (so enabling them later shows something).
 	const defaultTrackIdx = defaultSubtitleTrack.value
 		? textTracks.value.findIndex(t => t.url === defaultSubtitleTrack.value)
 		: -1;
