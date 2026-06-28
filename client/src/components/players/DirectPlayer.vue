@@ -310,13 +310,15 @@ async function loadVideoSource() {
 	}
 
 	captions.captionsTracks.value = getCaptionsTracks();
-	// Seed the selection and enabled state from the default track once; after this the original
-	// default no longer matters. The watcher then renders it.
+	// Seed the selection and enabled state once; after this the original default no longer matters.
+	// If there's a default subtitle track, select and show it. Otherwise default to the first track
+	// (so enabling captions shows something) but leave captions off.
 	const defaultTrackIdx = defaultSubtitleTrack.value
 		? textTracks.value.findIndex(t => t.url === defaultSubtitleTrack.value)
 		: -1;
-	setCaptionsTrack(defaultTrackIdx);
-	setCaptionsEnabled(defaultTrackIdx !== -1);
+	const hasDefault = defaultTrackIdx >= 0;
+	setCaptionsTrack(hasDefault ? defaultTrackIdx : 0);
+	setCaptionsEnabled(hasDefault);
 
 	videoElem.value.poster = thumbnail.value ?? "";
 	videoElem.value.load();
