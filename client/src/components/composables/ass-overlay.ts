@@ -1,5 +1,16 @@
 import { onBeforeUnmount, type Ref, ref } from "vue";
 import ASS from "assjs";
+import { i18n } from "@/i18n";
+import toast from "@/util/toast";
+import { ToastStyle } from "@/models/toast";
+
+function notifySubtitleLoadFailed(): void {
+	toast.add({
+		style: ToastStyle.Error,
+		content: i18n.global.t("room.subtitle-load-failed"),
+		duration: 6000,
+	});
+}
 
 export function useAssOverlay(
 	videoElement: Ref<HTMLVideoElement | undefined>,
@@ -82,6 +93,17 @@ export function useAssOverlay(
 				return false;
 			}
 			console.error("useAssOverlay: failed to load ASS subtitles:", url, e);
+			if (e instanceof TypeError) {
+				// A TypeError from fetch() means the request never completed as an HTTP
+				// exchange. For a cross-origin subtitle URL the most likely cause is a
+				// missing CORS header on the subtitle host, though it can also be a
+				// network/DNS failure or mixed content. The browser intentionally does not
+				// expose which, so we can only hint. See docs/custom-media-format.md.
+				console.error(
+					"useAssOverlay: the subtitle request failed before completing. This is often a CORS issue: the subtitle host must send an Access-Control-Allow-Origin header. See docs/custom-media-format.md for details.",
+				);
+			}
+			notifySubtitleLoadFailed();
 			currentUrl = null;
 			return false;
 		}
