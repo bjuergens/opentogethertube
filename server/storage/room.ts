@@ -5,6 +5,7 @@ import { getLogger } from "../logger.js";
 import Sequelize from "sequelize";
 import permissions from "ott-common/permissions.js";
 import type { RoomStatePersistable } from "../room.js";
+import { migrateLegacySubtitleUrlInItems } from "./legacy-subtitle.js";
 import _ from "lodash";
 
 const log = getLogger("storage/room");
@@ -117,7 +118,7 @@ function dbToRoomArgs(db: DbRoom): RoomOptions {
 		grants: new permissions.Grants(db.permissions),
 		userRoles: new Map<Role, Set<number>>(),
 		autoSkipSegmentCategories: db.autoSkipSegmentCategories,
-		prevQueue: db.prevQueue,
+		prevQueue: migrateLegacySubtitleUrlInItems(db.prevQueue),
 		restoreQueueBehavior: db.restoreQueueBehavior,
 		enableVoteSkip: db.enableVoteSkip,
 	};

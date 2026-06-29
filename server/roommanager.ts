@@ -16,6 +16,11 @@ import { type Result, ok, err } from "ott-common/result.js";
 import { Grants } from "ott-common/permissions.js";
 import type { ClientManagerCommand } from "./clientmanager.js";
 import { UnloadReason } from "./generated.js";
+import type { QueueItem } from "ott-common/models/video.js";
+import {
+	migrateLegacySubtitleUrl,
+	migrateLegacySubtitleUrlInItems,
+} from "./storage/legacy-subtitle.js";
 
 export const log = getLogger("roommanager");
 export const rooms: Room[] = [];
@@ -63,6 +68,11 @@ export async function shutdown() {
 }
 
 export function redisStateToState(state: RoomStateFromRedis): RoomState {
+	// Rooms persisted before `subtitleUrl` was merged into `defaultSubtitleTrack`
+	// stored the field under the old name; map it back so subtitles aren't lost.
+	migrateLegacySubtitleUrl(state.currentSource);
+	migrateLegacySubtitleUrlInItems(state.queue as unknown as QueueItem[]);
+	migrateLegacySubtitleUrlInItems(state.prevQueue);
 	const userRoles = new Map<Role, Set<number>>();
 	for (const [role, userIds] of state.userRoles) {
 		userRoles.set(role, new Set(userIds));

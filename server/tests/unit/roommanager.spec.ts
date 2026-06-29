@@ -115,6 +115,40 @@ describe("Room manager", () => {
 			expect(loadedRoom.realPlaybackPosition).toBeCloseTo(20, 1);
 		});
 
+		it("should migrate a legacy subtitleUrl to defaultSubtitleTrack when loading from redis", () => {
+			// Simulates a room serialized before subtitleUrl was merged into
+			// defaultSubtitleTrack: the field is still under the old name.
+			const legacyState = {
+				name: "test-legacy-subtitle",
+				currentSource: {
+					service: "direct",
+					id: "current",
+					subtitleUrl: "https://example.com/current.vtt",
+				},
+				queue: [
+					{ service: "direct", id: "queued", subtitleUrl: "https://example.com/q.ass" },
+				],
+				prevQueue: [
+					{ service: "direct", id: "prev", subtitleUrl: "https://example.com/p.vtt" },
+				],
+				grants: [],
+				userRoles: [],
+			} as unknown as RoomStateFromRedis;
+
+			const state = redisStateToState(legacyState);
+
+			expect(state.currentSource?.defaultSubtitleTrack).toEqual(
+				"https://example.com/current.vtt",
+			);
+			expect(state.currentSource).not.toHaveProperty("subtitleUrl");
+			expect(
+				(state.queue as unknown as { defaultSubtitleTrack?: string }[])[0]
+					.defaultSubtitleTrack,
+			).toEqual("https://example.com/q.ass");
+			expect(state.prevQueue?.[0].defaultSubtitleTrack).toEqual("https://example.com/p.vtt");
+			expect(state.prevQueue?.[0]).not.toHaveProperty("subtitleUrl");
+		});
+
 		it("should preserve empty prevQueue on unload and reload when current queue is empty", async () => {
 			const roomName = "test-prevqueue-empty";
 			try {
