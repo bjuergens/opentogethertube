@@ -686,7 +686,7 @@ components:
         id:
           type: string
           example: dQw4w9WgXcQ
-        defaultSubtitleTrack:
+        subtitleUrl:
           type: string
           format: uri
           nullable: true

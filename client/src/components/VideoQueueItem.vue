@@ -329,7 +329,7 @@ const hasError = ref(false);
 const voted = ref(false);
 const showEditDialog = ref(false);
 const editedDefaultTrack = ref<string | null>(
-	props.isPreview ? null : item.value.defaultSubtitleTrack ?? null,
+	props.isPreview ? null : item.value.subtitleUrl ?? null,
 );
 function setExternalSubtitleUrl(value: string): void {
 	editedDefaultTrack.value = normalizeSubtitleTrack(value);
@@ -376,21 +376,21 @@ function getPostData(): VideoAdd {
 	const data: VideoAdd = {
 		service: item.value.service,
 		id: item.value.id,
-		defaultSubtitleTrack:
-			(props.isPreview ? item.value.defaultSubtitleTrack : editedDefaultTrack.value) ?? null,
+		subtitleUrl:
+			(props.isPreview ? item.value.subtitleUrl : editedDefaultTrack.value) ?? null,
 	};
 	return data;
 }
 
 watch(showEditDialog, open => {
 	if (open && !props.isPreview) {
-		editedDefaultTrack.value = item.value.defaultSubtitleTrack ?? null;
+		editedDefaultTrack.value = item.value.subtitleUrl ?? null;
 	}
 });
 
 async function saveEdit() {
 	if (props.isPreview) {
-		item.value.defaultSubtitleTrack = editedDefaultTrack.value;
+		item.value.subtitleUrl = editedDefaultTrack.value;
 		showEditDialog.value = false;
 	} else {
 		isLoadingEdit.value = true;

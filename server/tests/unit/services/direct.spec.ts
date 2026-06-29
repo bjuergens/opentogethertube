@@ -158,7 +158,7 @@ describe("Direct", () => {
 			sources: [{ url: "https://example.com/video.mp4", contentType: "video/mp4", quality: 720 }],
 		};
 
-		it("passes text tracks through and picks the default track as defaultSubtitleTrack", async () => {
+		it("passes text tracks through and picks the default track as subtitleUrl", async () => {
 			stubManifest({
 				...baseManifest,
 				textTracks: [
@@ -175,7 +175,7 @@ describe("Direct", () => {
 			const video = await adapter.fetchManifestInfo("https://example.com/manifest.json");
 
 			expect(video.textTracks).toHaveLength(2);
-			expect(video.defaultSubtitleTrack).toEqual("https://example.com/de.ass");
+			expect(video.subtitleUrl).toEqual("https://example.com/de.ass");
 		});
 	});
 });

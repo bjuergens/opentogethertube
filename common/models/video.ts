@@ -24,15 +24,23 @@ export interface VideoMetadata {
 	 * for custom media manifest items (mime `application/json`) it must equal one of
 	 * `textTracks[].url`; for other (direct) items it is an arbitrary external subtitle URL
 	 * and is the only subtitle source. `null` and an absent field both mean "no subtitle".
+	 *
+	 * NOTE: This field is named `subtitleUrl` (rather than something like
+	 * `defaultSubtitleTrack`) on purpose: it is persisted by property name into the room
+	 * state stored in Redis and into the DB `prevQueue` column. Renaming it would silently
+	 * drop the subtitle URL of any room persisted before the rename, since there is no
+	 * migration that rewrites the old key. Keep the name stable unless you also add a
+	 * migration for the persisted data.
 	 */
-	defaultSubtitleTrack?: string | null;
+	subtitleUrl?: string | null;
 }
 
 export type Video = VideoId & Partial<VideoMetadata>;
 export interface QueueItemExtras {
 	startAt?: number;
 	endAt?: number;
-	defaultSubtitleTrack?: string | null;
+	/** See {@link VideoMetadata.subtitleUrl}. Kept as `subtitleUrl` for persistence compat. */
+	subtitleUrl?: string | null;
 }
 
 export type VideoAdd = VideoId & QueueItemExtras;

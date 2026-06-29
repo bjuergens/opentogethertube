@@ -53,12 +53,9 @@ const VideoIdSchema = z.object({
 const QueueItemExtrasSchema = z.object({
 	// startAt: z.number().nonnegative().optional(),
 	// endAt: z.number().positive().optional(),
-	defaultSubtitleTrack: z
-		.string()
-		.url()
-		.or(z.literal(""))
-		.nullish()
-		.transform(normalizeSubtitleTrack),
+	// Named `subtitleUrl` to stay compatible with room state persisted in Redis and the DB
+	// `prevQueue` column. See the docstring on VideoMetadata.subtitleUrl in models/video.ts.
+	subtitleUrl: z.string().url().or(z.literal("")).nullish().transform(normalizeSubtitleTrack),
 });
 
 const VideoAddSchema = VideoIdSchema.extend(QueueItemExtrasSchema.shape);

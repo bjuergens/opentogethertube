@@ -49,11 +49,11 @@ interface Props {
 	videoUrl: string;
 	videoMime: string;
 	thumbnail?: string;
-	defaultSubtitleTrack?: string | null;
+	subtitleUrl?: string | null;
 }
 
 const props = defineProps<Props>();
-const { videoUrl, videoMime, thumbnail, defaultSubtitleTrack } = toRefs(props);
+const { videoUrl, videoMime, thumbnail, subtitleUrl } = toRefs(props);
 const videoElem = ref<HTMLVideoElement | undefined>();
 const captions = useCaptions();
 const audioBoost = useMediaAudioBoost(videoElem);
@@ -65,8 +65,8 @@ const textTracks = computed<CustomMediaTextTrack[]>(() => {
 	if (videoMime.value === "application/json") {
 		return manifest.value?.textTracks ?? [];
 	}
-	if (defaultSubtitleTrack.value) {
-		return [externalSubtitleAsTextTrack(defaultSubtitleTrack.value)];
+	if (subtitleUrl.value) {
+		return [externalSubtitleAsTextTrack(subtitleUrl.value)];
 	}
 	return [];
 });
@@ -305,8 +305,8 @@ async function loadVideoSource() {
 	}
 
 	captions.captionsTracks.value = getCaptionsTracks();
-	const defaultTrackIdx = defaultSubtitleTrack.value
-		? textTracks.value.findIndex(t => t.url === defaultSubtitleTrack.value)
+	const defaultTrackIdx = subtitleUrl.value
+		? textTracks.value.findIndex(t => t.url === subtitleUrl.value)
 		: -1;
 	const hasDefault = defaultTrackIdx >= 0;
 	setCaptionsTrack(hasDefault ? defaultTrackIdx : 0);
@@ -369,8 +369,8 @@ onMounted(() => {
 	loadVideoSource();
 });
 
-watch([videoUrl, defaultSubtitleTrack], () => {
-	console.log("DirectPlayer: videoUrl or defaultSubtitleTrack changed");
+watch([videoUrl, subtitleUrl], () => {
+	console.log("DirectPlayer: videoUrl or subtitleUrl changed");
 	loadVideoSource();
 });
 
