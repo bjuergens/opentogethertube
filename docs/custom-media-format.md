@@ -50,21 +50,7 @@ Each text track entry in the `textTracks` array is a JSON object with the follow
 * `default`: An optional boolean indicating whether this subtitle track should be enabled by default.
 
 **Important note regarding text tracks and CORS:**
-
-Subtitle files are fetched directly by the viewer's browser, so they are subject to the browser's [Cross-Origin Resource Sharing (CORS)](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS) policy. This applies to **both** `text/vtt` and `text/x-ass` tracks. If a subtitle file is hosted on a different origin (domain, scheme, or port) than the OpenTogetherTube page, the host **must** serve that file with an appropriate `Access-Control-Allow-Origin` HTTP header, for example:
-
-```
-Access-Control-Allow-Origin: *
-```
-
-If the header is missing or incorrect, the browser blocks the request and the subtitle track silently fails to render. When this happens:
-
-* Viewers see a generic "Subtitle track could not be loaded" notification.
-* The browser's developer console contains more detail, including a hint that the failure is likely a CORS issue.
-
-Note that the browser does not reveal *why* a cross-origin fetch failed (it intentionally does not distinguish a CORS block from a `404`, a network error, or mixed `http`/`https` content), so the console message can only point you in the likely direction. The most common cause is a missing CORS header.
-
-To avoid CORS issues entirely, host your subtitle files on the same origin as the video, or on a host you control that you can configure to send the header above.
+Browsers block requests for text tracks hosted on different domains than the current page by default. To make text tracks work cross-origin, your host needs to serve the subtitle file with the `Access-Control-Allow-Origin` HTTP header.
 
 ## Example
 

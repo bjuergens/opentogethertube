@@ -94,13 +94,10 @@ export function useAssOverlay(
 			}
 			console.error("useAssOverlay: failed to load ASS subtitles:", url, e);
 			if (e instanceof TypeError) {
-				// A TypeError from fetch() means the request never completed as an HTTP
-				// exchange. For a cross-origin subtitle URL the most likely cause is a
-				// missing CORS header on the subtitle host, though it can also be a
-				// network/DNS failure or mixed content. The browser intentionally does not
-				// expose which, so we can only hint. See docs/custom-media-format.md.
 				console.error(
-					"useAssOverlay: the subtitle request failed before completing. This is often a CORS issue: the subtitle host must send an Access-Control-Allow-Origin header. See docs/custom-media-format.md for details.",
+					"useAssOverlay: could not load subtitles from url. This could be a CORS issue. see docs/custom-media-format.md",
+					url,
+					e,
 				);
 			}
 			notifySubtitleLoadFailed();
