@@ -53,8 +53,9 @@ const VideoIdSchema = z.object({
 const QueueItemExtrasSchema = z.object({
 	// startAt: z.number().nonnegative().optional(),
 	// endAt: z.number().positive().optional(),
-	// Named `subtitleUrl` to stay compatible with room state persisted in Redis and the DB
-	// `prevQueue` column. See the docstring on VideoMetadata.subtitleUrl in models/video.ts.
+	// This request field is not persisted itself, but it is named `subtitleUrl` to match the
+	// persisted field it feeds (see VideoMetadata.subtitleUrl in models/video.ts) and the
+	// pre-existing public API, so no mapping layer is needed between API and model.
 	subtitleUrl: z.string().url().or(z.literal("")).nullish().transform(normalizeSubtitleTrack),
 });
 
