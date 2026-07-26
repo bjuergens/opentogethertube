@@ -81,11 +81,12 @@ const textTracks = computed<CustomMediaTextTrack[]>(() => {
 });
 
 // The server rejects unsupported subtitle urls on the write path, so this may be overkill — but
-// dropping the track silently here would be annoying for a user to troubleshoot.
+// dropping the track silently here would be annoying for a user to troubleshoot. Manifest videos
+// are excluded: their tracks declare contentType explicitly, so the url extension is irrelevant.
 watch(
-	defaultSubtitleTrack,
-	url => {
-		if (url && inferSubtitleContentTypeOrNull(url) === null) {
+	[defaultSubtitleTrack, videoMime],
+	([url, mime]) => {
+		if (url && mime !== "application/json" && inferSubtitleContentTypeOrNull(url) === null) {
 			console.warn("DirectPlayer: unsupported subtitle url, ignoring:", url);
 			toast.add({
 				style: ToastStyle.Error,
