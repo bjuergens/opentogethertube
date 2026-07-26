@@ -19,19 +19,6 @@ export interface VideoMetadata {
 	dash_url?: string;
 	src_url?: string;
 	textTracks?: CustomMediaTextTrack[];
-	/**
-	 * URL of the subtitle track to show by default. The field is overloaded by item type:
-	 * for custom media manifest items (mime `application/json`) it must equal one of
-	 * `textTracks[].url`; for other (direct) items it is an arbitrary external subtitle URL
-	 * and is the only subtitle source. `null` and an absent field both mean "no subtitle".
-	 *
-	 * NOTE: This field is named `subtitleUrl` (rather than something like
-	 * `defaultSubtitleTrack`) on purpose: it is persisted by property name into the room
-	 * state stored in Redis and into the DB `prevQueue` column. Renaming it would silently
-	 * drop the subtitle URL of any room persisted before the rename, since there is no
-	 * migration that rewrites the old key. Keep the name stable unless you also add a
-	 * migration for the persisted data.
-	 */
 	subtitleUrl?: string | null;
 }
 
@@ -39,7 +26,7 @@ export type Video = VideoId & Partial<VideoMetadata>;
 export interface QueueItemExtras {
 	startAt?: number;
 	endAt?: number;
-	/** See {@link VideoMetadata.subtitleUrl}. Kept as `subtitleUrl` for persistence compat. */
+	/** Kept as `subtitleUrl` for persistence compat — this field is stored by name in Redis and the DB `prevQueue` column. */
 	subtitleUrl?: string | null;
 }
 
