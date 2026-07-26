@@ -159,16 +159,16 @@ describe("VideoQueueItem component", () => {
 		expect(API.post).toHaveBeenCalledWith("/room/foo/queue", {
 			service: "youtube",
 			id: "1",
-			defaultSubtitleTrack: null,
+			subtitleUrl: null,
 		});
 	});
 
-	it("adds preview video with defaultSubtitleTrack", async () => {
+	it("adds preview video with subtitleUrl", async () => {
 		API.post.mockResolvedValue({ data: { success: true } });
 		const directVideo = {
 			...video,
 			service: "direct",
-			defaultSubtitleTrack: "https://example.com/subtitles.vtt",
+			subtitleUrl: "https://example.com/subtitles.vtt",
 		};
 		const { wrapper, store } = mountComponent(VideoQueueItem, {
 			props: { item: directVideo, isPreview: true },
@@ -183,7 +183,7 @@ describe("VideoQueueItem component", () => {
 		expect(API.post).toHaveBeenCalledWith("/room/foo/queue", {
 			service: "direct",
 			id: "1",
-			defaultSubtitleTrack: "https://example.com/subtitles.vtt",
+			subtitleUrl: "https://example.com/subtitles.vtt",
 		});
 	});
 
@@ -197,7 +197,7 @@ describe("VideoQueueItem component", () => {
 		await flush();
 
 		expect(API.delete).toHaveBeenCalledWith("/room/foo/queue", {
-			data: { service: "youtube", id: "1", defaultSubtitleTrack: null },
+			data: { service: "youtube", id: "1", subtitleUrl: null },
 		});
 	});
 
@@ -238,7 +238,7 @@ describe("VideoQueueItem component", () => {
 		const directVideo = {
 			...video,
 			service: "direct",
-			defaultSubtitleTrack: "https://example.com/subtitles.vtt",
+			subtitleUrl: "https://example.com/subtitles.vtt",
 		};
 		const { wrapper, store } = mountComponent(VideoQueueItem, {
 			props: { item: directVideo, isPreview: false },
@@ -257,7 +257,7 @@ describe("VideoQueueItem component", () => {
 		expect(API.patch).toHaveBeenCalledWith("/room/foo/queue", {
 			service: "direct",
 			id: "1",
-			defaultSubtitleTrack: "not a url",
+			subtitleUrl: "not a url",
 		});
 		expect(wrapper.find('[data-cy="btn-remove-from-queue"] svg').exists()).toBe(true);
 	});

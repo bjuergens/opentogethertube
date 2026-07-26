@@ -438,7 +438,7 @@ const addToQueue: RequestHandler<
 			video: {
 				service: body.service,
 				id: body.id,
-				defaultSubtitleTrack: body.defaultSubtitleTrack,
+				subtitleUrl: body.subtitleUrl,
 			},
 		};
 	}
@@ -487,7 +487,7 @@ const updateQueueItem: RequestHandler<
 	const roomRequest: UpdateQueueItemRequest = {
 		type: RoomRequestType.UpdateQueueItemRequest,
 		video: { service: body.service, id: body.id },
-		update: { defaultSubtitleTrack: body.defaultSubtitleTrack },
+		update: { subtitleUrl: body.subtitleUrl },
 	};
 	await room.processUnauthorizedRequest(roomRequest, { token: req.token! });
 	res.json({

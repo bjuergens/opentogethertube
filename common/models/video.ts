@@ -19,20 +19,15 @@ export interface VideoMetadata {
 	dash_url?: string;
 	src_url?: string;
 	textTracks?: CustomMediaTextTrack[];
-	/**
-	 * URL of the subtitle track to show by default. The field is overloaded by item type:
-	 * for custom media manifest items (mime `application/json`) it must equal one of
-	 * `textTracks[].url`; for other (direct) items it is an arbitrary external subtitle URL
-	 * and is the only subtitle source. `null` and an absent field both mean "no subtitle".
-	 */
-	defaultSubtitleTrack?: string | null;
+	subtitleUrl?: string | null;
 }
 
 export type Video = VideoId & Partial<VideoMetadata>;
 export interface QueueItemExtras {
 	startAt?: number;
 	endAt?: number;
-	defaultSubtitleTrack?: string | null;
+	/** Kept as `subtitleUrl` for persistence compat — this field is stored by name in Redis and the DB `prevQueue` column. */
+	subtitleUrl?: string | null;
 }
 
 export type VideoAdd = VideoId & QueueItemExtras;

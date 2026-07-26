@@ -262,8 +262,8 @@ describe("Room", () => {
 				expect(room.playbackPosition).toEqual(0);
 			});
 
-			it("should preserve defaultSubtitleTrack from PlayNowRequest", async () => {
-				const defaultSubtitleTrack = "https://example.com/track.de.ass";
+			it("should preserve subtitleUrl from PlayNowRequest", async () => {
+				const subtitleUrl = "https://example.com/track.de.ass";
 				vi.spyOn(infoextractor, "getVideoInfo").mockResolvedValue(videoToPlay);
 
 				await room.processUnauthorizedRequest(
@@ -271,7 +271,7 @@ describe("Room", () => {
 						type: RoomRequestType.PlayNowRequest,
 						video: {
 							...videoToPlay,
-							defaultSubtitleTrack,
+							subtitleUrl,
 						},
 					},
 					{ token: user.token },
@@ -279,11 +279,11 @@ describe("Room", () => {
 
 				expect(room.currentSource).toEqual({
 					...videoToPlay,
-					defaultSubtitleTrack,
+					subtitleUrl,
 				});
 			});
 
-			it("should reject an unsupported defaultSubtitleTrack for PlayNowRequest", async () => {
+			it("should reject an unsupported subtitleUrl for PlayNowRequest", async () => {
 				vi.spyOn(infoextractor, "getVideoInfo").mockResolvedValue(videoToPlay);
 
 				await expect(
@@ -292,7 +292,7 @@ describe("Room", () => {
 							type: RoomRequestType.PlayNowRequest,
 							video: {
 								...videoToPlay,
-								defaultSubtitleTrack: "https://example.com/subtitles.srt",
+								subtitleUrl: "https://example.com/subtitles.srt",
 							},
 						},
 						{ token: user.token },
@@ -310,8 +310,8 @@ describe("Room", () => {
 				thumbnail: "test",
 				length: 10,
 			};
-			it("should add video with defaultSubtitleTrack to queue", async () => {
-				const defaultSubtitleTrack = "https://example.com/track.de.ass";
+			it("should add video with subtitleUrl to queue", async () => {
+				const subtitleUrl = "https://example.com/track.de.ass";
 				vi.spyOn(infoextractor, "getVideoInfo").mockResolvedValue(videoToAdd);
 
 				await room.processUnauthorizedRequest(
@@ -319,7 +319,7 @@ describe("Room", () => {
 						type: RoomRequestType.AddRequest,
 						video: {
 							...videoToAdd,
-							defaultSubtitleTrack,
+							subtitleUrl,
 						},
 					},
 					{ token: user.token },
@@ -328,11 +328,11 @@ describe("Room", () => {
 				expect(room.queue).toHaveLength(1);
 				expect(room.queue.items[0]).toEqual({
 					...videoToAdd,
-					defaultSubtitleTrack,
+					subtitleUrl,
 				});
 			});
 
-			it("should reject an unsupported defaultSubtitleTrack for AddRequest", async () => {
+			it("should reject an unsupported subtitleUrl for AddRequest", async () => {
 				vi.spyOn(infoextractor, "getVideoInfo").mockResolvedValue(videoToAdd);
 
 				await expect(
@@ -341,7 +341,7 @@ describe("Room", () => {
 							type: RoomRequestType.AddRequest,
 							video: {
 								...videoToAdd,
-								defaultSubtitleTrack: "https://example.com/subtitles.srt",
+								subtitleUrl: "https://example.com/subtitles.srt",
 							},
 						},
 						{ token: user.token },
