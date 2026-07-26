@@ -1,21 +1,22 @@
 import { onBeforeUnmount, type Ref, ref } from "vue";
+import { useI18n } from "vue-i18n";
 import ASS from "assjs";
-import { i18n } from "@/i18n";
 import toast from "@/util/toast";
 import { ToastStyle } from "@/models/toast";
-
-function notifySubtitleLoadFailed(): void {
-	toast.add({
-		style: ToastStyle.Error,
-		content: i18n.global.t("room.subtitle-load-failed"),
-		duration: 6000,
-	});
-}
 
 export function useAssOverlay(
 	videoElement: Ref<HTMLVideoElement | undefined>,
 	container: Ref<HTMLElement | undefined>,
 ) {
+	const { t } = useI18n();
+
+	function notifySubtitleLoadFailed(): void {
+		toast.add({
+			style: ToastStyle.Error,
+			content: t("room.subtitle-load-failed"),
+			duration: 6000,
+		});
+	}
 	let instance: ASS | null = null;
 	let currentUrl: string | null = null;
 	let loadSeq = 0;
