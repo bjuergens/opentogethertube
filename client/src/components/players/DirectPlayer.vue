@@ -42,7 +42,13 @@ import type {
 	MediaPlayerWithQuality,
 } from "../composables";
 import { useAssOverlay, useCaptions, useMediaAudioBoost, useQualities } from "../composables";
-import { externalSubtitleAsTextTrack } from "ott-common/subtitle";
+import {
+	externalSubtitleAsTextTrackOrNull,
+	inferSubtitleContentTypeOrNull,
+} from "ott-common/subtitle";
+import { useI18n } from "vue-i18n";
+import toast from "@/util/toast";
+import { ToastStyle } from "@/models/toast";
 
 interface Props {
 	service: string;
@@ -55,6 +61,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const { videoUrl, videoMime, thumbnail, defaultSubtitleTrack } = toRefs(props);
+const { t } = useI18n();
 const videoElem = ref<HTMLVideoElement | undefined>();
 const captions = useCaptions();
 const audioBoost = useMediaAudioBoost(videoElem);
@@ -67,10 +74,28 @@ const textTracks = computed<CustomMediaTextTrack[]>(() => {
 		return manifest.value?.textTracks ?? [];
 	}
 	if (defaultSubtitleTrack.value) {
-		return [externalSubtitleAsTextTrack(defaultSubtitleTrack.value)];
+		const track = externalSubtitleAsTextTrackOrNull(defaultSubtitleTrack.value);
+		return track ? [track] : [];
 	}
 	return [];
 });
+
+// The server rejects unsupported subtitle urls on the write path, so this may be overkill — but
+// dropping the track silently here would be annoying for a user to troubleshoot.
+watch(
+	defaultSubtitleTrack,
+	url => {
+		if (url && inferSubtitleContentTypeOrNull(url) === null) {
+			console.warn("DirectPlayer: unsupported subtitle url, ignoring:", url);
+			toast.add({
+				style: ToastStyle.Error,
+				content: t("room.subtitle-unsupported"),
+				duration: 6000,
+			});
+		}
+	},
+	{ immediate: true },
+);
 const vttTracks = computed(() =>
 	// biome-ignore lint/nursery/noVueRefAsOperand: false positive, `track` is a callback parameter, not a ref
 	textTracks.value.filter(track => track.contentType === "text/vtt")

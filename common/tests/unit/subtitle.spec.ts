@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { inferSubtitleContentTypeOrNull } from "../../subtitle.js";
+import {
+	externalSubtitleAsTextTrackOrNull,
+	inferSubtitleContentTypeOrNull,
+} from "../../subtitle.js";
 
 describe("inferSubtitleContentTypeOrNull", () => {
 	it("recognizes .ass and .ssa as ASS", () => {
@@ -27,5 +30,20 @@ describe("inferSubtitleContentTypeOrNull", () => {
 		expect(inferSubtitleContentTypeOrNull("https://example.com/a.srt")).toBeNull();
 		expect(inferSubtitleContentTypeOrNull("https://example.com/a.mp3")).toBeNull();
 		expect(inferSubtitleContentTypeOrNull("https://example.com/no-extension")).toBeNull();
+	});
+});
+
+describe("externalSubtitleAsTextTrackOrNull", () => {
+	it("builds a default track for supported urls", () => {
+		expect(externalSubtitleAsTextTrackOrNull("https://example.com/a.vtt")).toEqual({
+			url: "https://example.com/a.vtt",
+			contentType: "text/vtt",
+			srclang: "und",
+			default: true,
+		});
+	});
+
+	it("returns null instead of throwing for unsupported urls", () => {
+		expect(externalSubtitleAsTextTrackOrNull("https://example.com/a.srt")).toBeNull();
 	});
 });

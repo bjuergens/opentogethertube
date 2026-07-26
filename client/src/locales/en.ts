@@ -193,6 +193,7 @@ export default {
 		"player-settings": "Player settings",
 		subtitles: "Subtitles/CC",
 		"subtitle-load-failed": "Subtitle track could not be loaded",
+		"subtitle-unsupported": "Subtitle track format is not supported",
 		quality: "Quality",
 		"playback-speed": "Playback speed",
 		"mute-volume": "Mute",
