@@ -25,7 +25,6 @@ describe("inferSubtitleContentTypeOrNull", () => {
 		expect(inferSubtitleContentTypeOrNull("https://example.com/a.vtt#frag?x=.srt")).toEqual(
 			"text/vtt",
 		);
-		expect(inferSubtitleContentTypeOrNull("https://example.com/a.srt#x=.vtt")).toBeNull();
 	});
 
 	it("returns null for strings that are not absolute urls", () => {

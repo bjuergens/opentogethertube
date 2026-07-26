@@ -11,11 +11,9 @@ function subtitleUrlExtension(url: string): string | undefined {
 	} catch {
 		return undefined;
 	}
-	const fileName = pathname.split("/").slice(-1)[0].trim();
-	if (!fileName.includes(".")) {
-		return undefined;
-	}
-	return fileName.split(".").slice(-1)[0].toLowerCase();
+	const fileName = pathname.split("/").slice(-1)[0];
+	const dot = fileName.lastIndexOf(".");
+	return dot === -1 ? undefined : fileName.slice(dot + 1).toLowerCase();
 }
 
 export function inferSubtitleContentTypeOrNull(
