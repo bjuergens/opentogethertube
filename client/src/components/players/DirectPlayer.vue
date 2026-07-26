@@ -49,11 +49,16 @@ interface Props {
 	videoUrl: string;
 	videoMime: string;
 	thumbnail?: string;
-	subtitleUrl?: string | null;
+	/**
+	 * URL of the subtitle track to show by default. Fed from the queue item's `subtitleUrl`
+	 * field; named differently here because at the player level it selects which text track
+	 * is the default (for manifest items it must match one of the declared tracks).
+	 */
+	defaultSubtitleTrack?: string | null;
 }
 
 const props = defineProps<Props>();
-const { videoUrl, videoMime, thumbnail, subtitleUrl } = toRefs(props);
+const { videoUrl, videoMime, thumbnail, defaultSubtitleTrack } = toRefs(props);
 const videoElem = ref<HTMLVideoElement | undefined>();
 const captions = useCaptions();
 const audioBoost = useMediaAudioBoost(videoElem);
@@ -65,8 +70,8 @@ const textTracks = computed<CustomMediaTextTrack[]>(() => {
 	if (videoMime.value === "application/json") {
 		return manifest.value?.textTracks ?? [];
 	}
-	if (subtitleUrl.value) {
-		return [externalSubtitleAsTextTrack(subtitleUrl.value)];
+	if (defaultSubtitleTrack.value) {
+		return [externalSubtitleAsTextTrack(defaultSubtitleTrack.value)];
 	}
 	return [];
 });
@@ -305,8 +310,8 @@ async function loadVideoSource() {
 	}
 
 	captions.captionsTracks.value = getCaptionsTracks();
-	const defaultTrackIdx = subtitleUrl.value
-		? textTracks.value.findIndex(t => t.url === subtitleUrl.value)
+	const defaultTrackIdx = defaultSubtitleTrack.value
+		? textTracks.value.findIndex(t => t.url === defaultSubtitleTrack.value)
 		: -1;
 	const hasDefault = defaultTrackIdx >= 0;
 	setCaptionsTrack(hasDefault ? defaultTrackIdx : 0);
@@ -369,8 +374,8 @@ onMounted(() => {
 	loadVideoSource();
 });
 
-watch([videoUrl, subtitleUrl], () => {
-	console.log("DirectPlayer: videoUrl or subtitleUrl changed");
+watch([videoUrl, defaultSubtitleTrack], () => {
+	console.log("DirectPlayer: videoUrl or defaultSubtitleTrack changed");
 	loadVideoSource();
 });
 
