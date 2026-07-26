@@ -49,11 +49,7 @@ interface Props {
 	videoUrl: string;
 	videoMime: string;
 	thumbnail?: string;
-	/**
-	 * URL of the subtitle track to show by default. Fed from the queue item's `subtitleUrl`
-	 * field; named differently here because at the player level it selects which text track
-	 * is the default (for manifest items it must match one of the declared tracks).
-	 */
+	/** URL of the subtitle track to show by default. Fed from the queue item's `subtitleUrl`. */
 	defaultSubtitleTrack?: string | null;
 }
 
