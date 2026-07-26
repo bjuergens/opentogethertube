@@ -1262,8 +1262,8 @@ export class Room implements RoomState {
 				this.log.error("video was undefined, which is bad");
 				throw new Error("video was undefined");
 			}
-			assertSupportedSubtitleTrack(request.video.defaultSubtitleTrack);
-			video.defaultSubtitleTrack = request.video.defaultSubtitleTrack ?? null;
+			assertSupportedSubtitleTrack(request.video.subtitleUrl);
+			video.subtitleUrl = request.video.subtitleUrl ?? null;
 			this.queue.enqueue(video);
 			this.log.info(`Video added: ${JSON.stringify(request.video)}`);
 			this.prevQueue = null;
@@ -1271,12 +1271,12 @@ export class Room implements RoomState {
 			counterMediaQueued.labels({ service: video.service }).inc();
 		} else if (request.videos) {
 			for (const v of request.videos) {
-				assertSupportedSubtitleTrack(v.defaultSubtitleTrack);
+				assertSupportedSubtitleTrack(v.subtitleUrl);
 			}
 			const videos: Video[] = await InfoExtract.getManyVideoInfo(request.videos);
 
 			const subtitleByKey = new Map(
-				request.videos.map(v => [`${v.service}:${v.id}`, v.defaultSubtitleTrack ?? null]),
+				request.videos.map(v => [`${v.service}:${v.id}`, v.subtitleUrl ?? null]),
 			);
 
 			for (let i = 0; i < videos.length; i++) {
@@ -1285,8 +1285,7 @@ export class Room implements RoomState {
 					this.log.error("video was undefined, which is bad");
 					throw new Error("video was undefined");
 				}
-				video.defaultSubtitleTrack =
-					subtitleByKey.get(`${video.service}:${video.id}`) ?? null;
+				video.subtitleUrl = subtitleByKey.get(`${video.service}:${video.id}`) ?? null;
 				if (this.isVideoInQueue(video)) {
 					videos.splice(i--, 1);
 				}
@@ -1311,7 +1310,7 @@ export class Room implements RoomState {
 		request: UpdateQueueItemRequest,
 		context: RoomRequestContext,
 	): Promise<void> {
-		assertSupportedSubtitleTrack(request.update.defaultSubtitleTrack);
+		assertSupportedSubtitleTrack(request.update.subtitleUrl);
 		await this.queue.update(request.video, request.update);
 		this.log.info(`Queue item updated: ${JSON.stringify(request.video)}`);
 		await this.publishRoomEvent(request, context);
@@ -1698,8 +1697,8 @@ export class Room implements RoomState {
 		} else {
 			videoToPlay = await InfoExtract.getVideoInfo(request.video.service, request.video.id);
 		}
-		assertSupportedSubtitleTrack(request.video.defaultSubtitleTrack);
-		videoToPlay.defaultSubtitleTrack = request.video.defaultSubtitleTrack ?? null;
+		assertSupportedSubtitleTrack(request.video.subtitleUrl);
+		videoToPlay.subtitleUrl = request.video.subtitleUrl ?? null;
 		if (this.currentSource) {
 			this.currentSource.startAt = this.realPlaybackPosition;
 			await this.queue.pushTop(this.currentSource);

@@ -49,6 +49,7 @@ interface Props {
 	videoUrl: string;
 	videoMime: string;
 	thumbnail?: string;
+	/** URL of the subtitle track to show by default. Fed from the queue item's `subtitleUrl`. */
 	defaultSubtitleTrack?: string | null;
 }
 
