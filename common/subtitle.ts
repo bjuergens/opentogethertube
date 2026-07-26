@@ -5,8 +5,12 @@ export function normalizeSubtitleTrack(value: string | null | undefined): string
 }
 
 function subtitleUrlExtension(url: string): string | undefined {
-	const path = url.split("?")[0].split("#")[0];
-	return path.split(".").pop()?.toLowerCase();
+	// TODO: replace with `URL.parse(url)?.pathname` once typescript is upgraded to >= 5.7,
+	// which is when `URL.parse` was added to the dom lib types.
+	if (!URL.canParse(url)) {
+		return undefined;
+	}
+	return new URL(url).pathname.split(".").pop()?.toLowerCase();
 }
 
 export function inferSubtitleContentTypeOrNull(
