@@ -8,6 +8,7 @@ export function useAssOverlay(
 	videoElement: Ref<HTMLVideoElement | undefined>,
 	container: Ref<HTMLElement | undefined>,
 ) {
+	// The app-level i18n instance from "@/i18n" has no `.t`; only useI18n() provides it.
 	const { t } = useI18n();
 
 	function notifySubtitleLoadFailed(): void {
