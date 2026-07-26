@@ -18,8 +18,27 @@ describe("inferSubtitleContentTypeOrNull", () => {
 		expect(inferSubtitleContentTypeOrNull("https://example.com/a.ass?token=1")).toEqual(
 			"text/x-ass",
 		);
-		expect(inferSubtitleContentTypeOrNull("https://example.com/a.vtt#t=10")).toEqual("text/vtt");
+		expect(inferSubtitleContentTypeOrNull("https://example.com/a.vtt#t=10")).toEqual(
+			"text/vtt",
+		);
 		expect(inferSubtitleContentTypeOrNull("https://example.com/a.srt?x=.vtt")).toBeNull();
+		expect(inferSubtitleContentTypeOrNull("https://example.com/a.vtt#frag?x=.srt")).toEqual(
+			"text/vtt",
+		);
+		expect(inferSubtitleContentTypeOrNull("https://example.com/a.srt#x=.vtt")).toBeNull();
+	});
+
+	it("returns null for strings that are not absolute urls", () => {
+		expect(inferSubtitleContentTypeOrNull("not a url")).toBeNull();
+		expect(inferSubtitleContentTypeOrNull("")).toBeNull();
+		expect(inferSubtitleContentTypeOrNull("a.vtt")).toBeNull();
+	});
+
+	it("ignores dots in directory names", () => {
+		expect(inferSubtitleContentTypeOrNull("https://example.com/v1.2/subs")).toBeNull();
+		expect(inferSubtitleContentTypeOrNull("https://example.com/v1.2/subs.vtt")).toEqual(
+			"text/vtt",
+		);
 	});
 
 	it("is case-insensitive", () => {

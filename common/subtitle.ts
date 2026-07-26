@@ -5,8 +5,17 @@ export function normalizeSubtitleTrack(value: string | null | undefined): string
 }
 
 function subtitleUrlExtension(url: string): string | undefined {
-	const path = url.split("?")[0].split("#")[0];
-	return path.split(".").pop()?.toLowerCase();
+	let pathname: string;
+	try {
+		pathname = new URL(url).pathname;
+	} catch {
+		return undefined;
+	}
+	const fileName = pathname.split("/").slice(-1)[0].trim();
+	if (!fileName.includes(".")) {
+		return undefined;
+	}
+	return fileName.split(".").slice(-1)[0].toLowerCase();
 }
 
 export function inferSubtitleContentTypeOrNull(
