@@ -328,9 +328,7 @@ const thumbnailHasError = ref(false);
 const hasError = ref(false);
 const voted = ref(false);
 const showEditDialog = ref(false);
-const editedDefaultTrack = ref<string | null>(
-	props.isPreview ? null : item.value.subtitleUrl ?? null,
-);
+const editedDefaultTrack = ref<string | null>(item.value.subtitleUrl ?? null);
 function setExternalSubtitleUrl(value: string): void {
 	editedDefaultTrack.value = normalizeSubtitleTrack(value);
 }

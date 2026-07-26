@@ -22,11 +22,10 @@ export function inferSubtitleContentTypeOrNull(
 	return null;
 }
 
-export function externalSubtitleAsTextTrack(url: string): CustomMediaTextTrack {
+export function externalSubtitleAsTextTrackOrNull(url: string): CustomMediaTextTrack | null {
 	const contentType = inferSubtitleContentTypeOrNull(url);
 	if (!contentType) {
-		// Callers only reach here with a server-validated url, so this is a programming error.
-		throw new Error(`Cannot build a text track for unsupported subtitle url: ${url}`);
+		return null;
 	}
 	return {
 		url,
