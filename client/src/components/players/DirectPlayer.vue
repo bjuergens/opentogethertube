@@ -72,6 +72,7 @@ const textTracks = computed<CustomMediaTextTrack[]>(() => {
 	return [];
 });
 const vttTracks = computed(() =>
+	// biome-ignore lint/nursery/noVueRefAsOperand: false positive, `track` is a callback parameter, not a ref
 	textTracks.value.filter(track => track.contentType === "text/vtt")
 );
 const assOverlay = useAssOverlay(videoElem, assContainer);
